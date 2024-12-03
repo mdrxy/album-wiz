@@ -2,6 +2,10 @@ import os
 from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException
 import asyncpg
+import query
+from fastapi import UploadFile, File
+from PIL import Image
+import io
 
 DATABASE_URL = os.getenv("DATABASE_URL") # From docker-compose.yml
 
@@ -36,3 +40,20 @@ async def get_artists():
             return artists
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+@app.post("/api/query")
+async def vectorize(): 
+    """
+    This is the end point 
+    """
+    @app.post("/api/query")
+    async def vectorize(file: UploadFile = File(...)):
+        """
+        Endpoint to receive an image file and convert it to a PIL image.
+        """
+        try:
+            contents = await file.read()
+            image = Image.open(io.BytesIO(contents))
+            return {"message": "Image successfully converted"}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e

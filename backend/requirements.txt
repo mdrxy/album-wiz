@@ -5,3 +5,4 @@ redis
 torch
 numpy
 asyncpg
+pillow
