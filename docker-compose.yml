@@ -1,0 +1,114 @@
+services:
+  frontend:
+    build:
+      context: ./frontend # The local path to the frontend source code
+    container_name: vinyl-frontend
+    ports:
+      - "3000:80" # Map port 3000 on the host to port 3000 in the container
+    volumes:
+      - ./frontend:/app # Mounts the local frontend directory into the container for development (real-time changes)
+    environment:
+      # Variables that can be accessed in the frontend application
+      - REACT_APP_API_BASE_URL=http://backend:8000 # Base URL for the backend API
+      - CHOKIDAR_USEPOLLING=true # File change detection for quick reloads in development
+    networks:
+      - vinyl-network # Putting all services in the same network for inter-container communication
+
+  backend:
+    build:
+      context: ./backend
+    container_name: vinyl-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgres://admin:postgres@database:5432/vinyl_db # Database connection string
+      - REDIS_URL=redis://cache:6379 # Redis cache connection string
+    networks:
+      - vinyl-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - database # Ensure the database container starts before the backend
+      - cache # Ensure the Redis cache container starts before the backend
+
+  database:
+    build:
+        context: ./database
+    container_name: vinyl-database
+    ports:
+      - "5432:5432" # (Postgres default)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with a custom SQL script
+    environment:
+      - POSTGRES_USER=admin # Default database user
+      - POSTGRES_PASSWORD=postgres # Default password for the user
+      - POSTGRES_DB=vinyl_db # Database name
+    networks:
+      - vinyl-network
+    
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vinyl-pgadmin
+    ports:
+      - "5050:80" # Map port 5050 on the host to port 80 in the pgAdmin container
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@vinyl.com # Default pgAdmin login email
+      - PGADMIN_DEFAULT_PASSWORD=admin # Default pgAdmin login password
+    volumes:
+    - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
+    depends_on:
+      - database # Ensure the database container starts before pgAdmin
+    networks:
+      - vinyl-network
+
+  cache:
+    image: redis:7
+    container_name: vinyl-cache
+    ports:
+      - "6379:6379" # (Redis default)
+    networks:
+      - vinyl-network
+    volumes:
+      - redis_data:/data
+
+  vector-search:
+    build:
+      context: ./vector-search
+    container_name: vinyl-vector-search
+    ports:
+      - "8001:8001"
+    environment:
+    - DATABASE_URL=postgres://postgres:postgres@database:5432/vinyl_db
+    networks:
+      - vinyl-network
+    depends_on:
+      - database # FYI - doesn't guarantee that the database is ready
+
+  nginx:
+    image: nginx:latest # Use the official Nginx image.
+    container_name: vinyl-nginx
+    ports:
+      - "80:80" # Default (http) web port
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # Bind mount the config file.
+      # 'ro' ensures read-only access meaning the container can't modify the file on the host
+    networks:
+      - vinyl-network
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
+  redis_data: # Define a persistent volume for the Redis cache
+
+networks:
+  vinyl-network:
+    # Define a custom network for inter-container communication
+    driver: bridge # Use the bridge network driver for isolation
