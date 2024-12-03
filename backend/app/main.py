@@ -3,6 +3,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException
 import asyncpg
 import query
+import normalize
 from fastapi import UploadFile, File
 from PIL import Image
 import io
@@ -41,19 +42,17 @@ async def get_artists():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
+
 @app.post("/api/query")
-async def vectorize(): 
+async def vectorize(file: UploadFile = File(...)):
     """
-    This is the end point 
+    Endpoint to receive an image file and convert it to a PIL image.
     """
-    @app.post("/api/query")
-    async def vectorize(file: UploadFile = File(...)):
-        """
-        Endpoint to receive an image file and convert it to a PIL image.
-        """
-        try:
-            contents = await file.read()
-            image = Image.open(io.BytesIO(contents))
-            return {"message": "Image successfully converted"}
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+        vector = query.vectorize(image)
+        return {"message": "Image successfully converted", 
+                "vector": vector}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
