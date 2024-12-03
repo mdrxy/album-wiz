@@ -6,3 +6,4 @@ torch
 numpy
 asyncpg
 pillow
+python-multipart
