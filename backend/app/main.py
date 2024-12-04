@@ -11,7 +11,6 @@ import io
 import logging
 from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
 import asyncpg
 from PIL import Image
 
@@ -48,21 +47,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator:
     await application.state.pool.close()
 
 
-# Configure CORS
-origins = [
-    "http://localhost:3000",  # React frontend
-    # Add other origins as needed
-]
-
 # Initialize FastAPI application
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 orchestrator = MetadataOrchestrator()
 router = APIRouter()
@@ -76,7 +62,7 @@ async def read_root():
     return {"message": "Hello, World!"}
 
 
-@router.get("/{table_name}")
+@router.get("/db/{table_name}")
 async def get_table_data(table_name: str):
     """
     Retrieve all data from the specified table in the database.
@@ -108,7 +94,7 @@ async def vectorize(file: UploadFile = File(...)):
     """
     Endpoint to receive an image file and convert it to a PIL image.
     """
-    logger.debug("I am here!!")
+    logger.debug("Received file: %s", file.filename)
     try:
         logger.debug("Reading file contents...")
         contents = await file.read()

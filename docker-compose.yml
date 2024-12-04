@@ -34,7 +34,7 @@ services:
 
   database:
     build:
-        context: ./database
+      context: ./database
     container_name: vinyl-database
     volumes:
       - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data
@@ -45,7 +45,7 @@ services:
       - POSTGRES_DB=vinyl_db # Database name
     networks:
       - vinyl-network
-    
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
@@ -53,7 +53,7 @@ services:
       - PGADMIN_DEFAULT_EMAIL=admin@vinyl.com # Default pgAdmin login email
       - PGADMIN_DEFAULT_PASSWORD=admin # Default pgAdmin login password
     volumes:
-    - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
     depends_on:
       - database # Ensure the database container starts before pgAdmin
     networks:
@@ -72,7 +72,7 @@ services:
       context: ./vector-search
     container_name: vinyl-vector-search
     environment:
-    - DATABASE_URL=postgres://postgres:postgres@database:5432/vinyl_db
+      - DATABASE_URL=postgres://postgres:postgres@database:5432/vinyl_db
     depends_on:
       - database # FYI - doesn't guarantee that the database is ready
     networks:
@@ -95,7 +95,8 @@ services:
 
 volumes:
   postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
-  redis_data: # Define a persistent volume for the Redis cache
+  redis_data:
+    # Define a persistent volume for the Redis cache
 
 networks:
   vinyl-network:

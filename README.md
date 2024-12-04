@@ -44,8 +44,10 @@ The vector search service is separated into its own service for modularity, scal
 2. Build and start the containers:
 
     ```bash
-    docker compose up --build
+    docker compose up -d --build
     ```
+
+    Note: if you omit `-d`, the app will still launch and logs will be output to your terminal. However, upon pressing `CTRL-C`, the containers will stop. The `-d` flag detaches the containers and runs them in the background.
 
 3. Access the services:
    - Frontend: <http://localhost/>
