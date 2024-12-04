@@ -2,13 +2,15 @@
 Main FastAPI application.
 
 This module contains the main FastAPI application and defines the API routes.
+
+Each route has /api as a prefix, so the full path to the route is /api/{route}.
 """
 
 import os
 import io
 import logging
 from typing import AsyncGenerator
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 import asyncpg
 from PIL import Image
@@ -16,12 +18,18 @@ from PIL import Image
 from app import normalize, query
 from app.metadata_orchestrator import MetadataOrchestrator
 
-DATABASE_URL = os.getenv("DATABASE_URL")  # From docker-compose.yml
+
+# Configure logging
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.info("Initializing DiscogsCollector")
+
+
+# Config database connection
+
+DATABASE_URL = os.getenv("DATABASE_URL")  # From docker-compose.yml
 
 
 async def lifespan(application: FastAPI) -> AsyncGenerator:
@@ -40,14 +48,14 @@ async def lifespan(application: FastAPI) -> AsyncGenerator:
     await application.state.pool.close()
 
 
-app = FastAPI(lifespan=lifespan)
-
 # Configure CORS
 origins = [
     "http://localhost:3000",  # React frontend
     # Add other origins as needed
 ]
 
+# Initialize FastAPI application
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -57,9 +65,18 @@ app.add_middleware(
 )
 
 orchestrator = MetadataOrchestrator()
+router = APIRouter()
 
 
-@app.get("/api/{table_name}")
+@router.get("/")
+async def read_root():
+    """
+    Default route to test if the API is running.
+    """
+    return {"message": "Hello, World!"}
+
+
+@router.get("/{table_name}")
 async def get_table_data(table_name: str):
     """
     Retrieve all data from the specified table in the database.
@@ -74,7 +91,7 @@ async def get_table_data(table_name: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/metadata/{search_query}")
+@router.get("/metadata/{search_query}")
 async def get_metadata(search_query: str):
     """
     Collect metadata for a record from multiple sources.
@@ -86,7 +103,7 @@ async def get_metadata(search_query: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/api/query")
+@router.post("/query")
 async def vectorize(file: UploadFile = File(...)):
     """
     Endpoint to receive an image file and convert it to a PIL image.
@@ -111,9 +128,11 @@ async def vectorize(file: UploadFile = File(...)):
 
         logger.debug("Vector: %s", vector)
 
-        # TODO: Stop serialized with the stupid fucking python list.
         return {"message": "Image successfully converted", "vector": vector.tolist()}
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+app.include_router(router, prefix="/api")
