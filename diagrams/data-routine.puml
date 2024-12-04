@@ -1,0 +1,21 @@
+@startuml Metadata Collection Routine
+title Metadata Collection Routine
+
+actor "System Admin" as Admin
+participant "Metadata Aggregation Service" as MetaAgg
+participant "External APIs" as APIs
+database "Database" as DB
+
+Admin -> MetaAgg: Initiates metadata collection routine
+MetaAgg -> DB: Fetch list of items for update
+DB --> MetaAgg: Returns list of items
+
+loop For each item
+    MetaAgg -> APIs: Request metadata (e.g., Spotify, Last.fm, Discogs)
+    APIs --> MetaAgg: Return metadata
+    MetaAgg -> DB: Store metadata
+end
+
+MetaAgg --> Admin: Reports completion of metadata collection
+
+@enduml

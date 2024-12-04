@@ -1,0 +1,18 @@
+@startuml Vinyl Companion High-Level Sequence Diagram
+title Vinyl Companion High-Level Sequence Diagram
+actor DJ as User
+participant "Frontend" as App
+participant "Backend" as Backend
+participant "Image Processing Service" as ImgProc
+participant "Machine Learning Model" as MLModel
+database "Database/Cache" as DB
+
+User -> App: Take picture of album cover
+App -> ImgProc: Uploads image for preprocessing
+ImgProc -> MLModel: Sends preprocessed image for classification
+MLModel -> Backend: Returns record ID(s)
+Backend -> DB: Requests metadata
+DB --> Backend: Returns metadata
+Backend --> App: Sends aggregated metadata
+App --> User: Displays metadata
+@enduml
