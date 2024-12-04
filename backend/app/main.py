@@ -74,6 +74,8 @@ async def get_table_data(table_name: str):
             data = [dict(row) for row in rows]
             return data
     except Exception as e:
+        if "does not exist" in str(e).lower():
+            return {"message": f"The table `{table_name}` does not exist."}
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
