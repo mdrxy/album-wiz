@@ -1,5 +1,12 @@
+"""
+Main FastAPI application.
+
+This module contains the main FastAPI application and defines the API routes.
+"""
+
 import os
 import io
+import logging
 from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,8 +14,14 @@ import asyncpg
 from PIL import Image
 
 from app import normalize, query
+from app.metadata_orchestrator import MetadataOrchestrator
 
 DATABASE_URL = os.getenv("DATABASE_URL")  # From docker-compose.yml
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.info("Initializing DiscogsCollector")
 
 
 async def lifespan(application: FastAPI) -> AsyncGenerator:
@@ -43,6 +56,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+orchestrator = MetadataOrchestrator()
+
 
 @app.get("/api/{table_name}")
 async def get_table_data(table_name: str):
@@ -59,30 +74,42 @@ async def get_table_data(table_name: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/api/metadata/{search_query}")
+async def get_metadata(search_query: str):
+    """
+    Collect metadata for a record from multiple sources.
+    """
+    try:
+        metadata = await orchestrator.collect_metadata(search_query)
+        return {"query": search_query, "metadata": metadata}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.post("/api/query")
 async def vectorize(file: UploadFile = File(...)):
     """
     Endpoint to receive an image file and convert it to a PIL image.
     """
-    print("I am here!!")
+    logger.debug("I am here!!")
     try:
-        print("Reading file contents...")
+        logger.debug("Reading file contents...")
         contents = await file.read()
-        print("File contents read successfully.")
+        logger.debug("File contents read successfully.")
 
-        print("Opening image...")
+        logger.debug("Opening image...")
         image = Image.open(io.BytesIO(contents))
-        print("Image opened successfully.")
+        logger.debug("Image opened successfully.")
 
-        print("Cropping image to square...")
+        logger.debug("Cropping image to square...")
         square_image = normalize.crop_to_square(image)
-        print("Image cropped to square successfully.")
+        logger.debug("Image cropped to square successfully.")
 
-        print("Vectorizing image...")
+        logger.debug("Vectorizing image...")
         vector = query.vectorize(square_image)
-        print("Image vectorized successfully.")
+        logger.debug("Image vectorized successfully.")
 
-        print(f"Vector: {vector}")
+        logger.debug("Vector: %s", vector)
 
         # TODO: Stop serialized with the stupid fucking python list.
         return {"message": "Image successfully converted", "vector": vector.tolist()}
