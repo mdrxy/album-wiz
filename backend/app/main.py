@@ -75,6 +75,7 @@ async def get_table_data(table_name: str):
             return data
     except Exception as e:
         if "does not exist" in str(e).lower():
+            logger.debug("Table %s does not exist.", table_name)
             return {"message": f"The table `{table_name}` does not exist."}
         raise HTTPException(status_code=500, detail=str(e)) from e
 
