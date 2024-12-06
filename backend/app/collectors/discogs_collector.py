@@ -3,17 +3,23 @@ This module contains the DiscogsCollector class that fetches metadata from the D
 """
 
 import logging
-import discogs_client
+import os
+import discogs_client  # https://github.com/joalla/discogs_client
 from app.collectors.base_collector import MetadataCollector
+from dotenv import load_dotenv
+
+
+load_dotenv()
+USER_AGENT = os.getenv("DISCOGS_USER_AGENT")
+TOKEN = os.getenv("DISCOGS_TOKEN")
 
 
 class DiscogsCollector(MetadataCollector):
     """
     Fetch metadata from Discogs' API using the discogs_client library.
-    """
 
-    USER_AGENT = "album-wiz/1.0 +https://github.com/mdrxy/album-wiz"
-    TOKEN = ""
+    https://www.discogs.com/developers/
+    """
 
     def __init__(self):
         logging.basicConfig(level=logging.DEBUG)
@@ -21,7 +27,7 @@ class DiscogsCollector(MetadataCollector):
         self.logger.setLevel(logging.DEBUG)
         self.logger.info("Initializing DiscogsCollector")
 
-        self.client = discogs_client.Client(self.USER_AGENT, user_token=self.TOKEN)
+        self.client = discogs_client.Client(USER_AGENT, user_token=TOKEN)
         self.logger.info("Discogs client initialized")
 
     async def fetch_metadata(self, query: str) -> dict:

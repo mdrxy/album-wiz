@@ -7,8 +7,10 @@ services:
       - ./frontend:/app # Mounts the local frontend directory into the container for development (real-time changes)
     environment:
       # Variables that can be accessed in the frontend application
-      - REACT_APP_API_BASE_URL=/api # Base URL for the backend API
-      - CHOKIDAR_USEPOLLING=true # File change detection for quick reloads in development
+      - REACT_APP_API_BASE_URL
+      - CHOKIDAR_USEPOLLING
+    env_file:
+      - .env
     networks:
       - vinyl-network # Putting all services in the same network for inter-container communication
 
@@ -19,8 +21,10 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgres://admin:postgres@database:5432/vinyl_db # Database connection string
-      - REDIS_URL=redis://cache:6379 # Redis cache connection string
+      - DATABASE_URL
+      - REDIS_URL
+    env_file:
+      - .env
     logging:
       driver: "json-file"
       options:
@@ -40,9 +44,9 @@ services:
       - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with a custom SQL script
     environment:
-      - POSTGRES_USER=admin # Default database user
-      - POSTGRES_PASSWORD=postgres # Default password for the user
-      - POSTGRES_DB=vinyl_db # Database name
+      - POSTGRES_DB
+    env_file:
+      - .env
     networks:
       - vinyl-network
 
@@ -50,8 +54,10 @@ services:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@vinyl.com # Default pgAdmin login email
-      - PGADMIN_DEFAULT_PASSWORD=admin # Default pgAdmin login password
+      - PGADMIN_DEFAULT_EMAIL
+      - PGADMIN_DEFAULT_PASSWORD
+    env_file:
+      - .env
     volumes:
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
     depends_on:
@@ -72,7 +78,9 @@ services:
       context: ./vector-search
     container_name: vinyl-vector-search
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@database:5432/vinyl_db
+      - DATABASE_URL
+    env_file:
+      - .env
     depends_on:
       - database # FYI - doesn't guarantee that the database is ready
     networks:
