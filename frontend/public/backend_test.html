@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Backend API Test</title>
 </head>
+
 <body>
     <h1>Upload Image and Get JSON Response!!</h1>
     <form id="uploadForm">
@@ -15,9 +17,9 @@
     <pre id="responseOutput"></pre>
 
     <script>
-        document.getElementById('uploadForm').addEventListener('submit', async function(event) {
+        document.getElementById('uploadForm').addEventListener('submit', async function (event) {
             event.preventDefault();
-            
+
             const imageInput = document.getElementById('imageInput');
             if (imageInput.files.length === 0) {
                 alert('Please select an image to upload.');
@@ -28,10 +30,16 @@
             formData.append('file', imageInput.files[0]);
 
             try {
-                const response = await fetch('http://localhost:8000/api/query', {
+                document.getElementById('responseOutput').textContent = 'Uploading...';
+
+                const response = await fetch('/api/query', {
                     method: 'POST',
                     body: formData
                 });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
                 const jsonResponse = await response.json();
                 document.getElementById('responseOutput').textContent = JSON.stringify(jsonResponse, null, 2);
@@ -41,4 +49,5 @@
         });
     </script>
 </body>
+
 </html>

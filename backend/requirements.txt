@@ -7,3 +7,7 @@ numpy
 asyncpg
 pillow
 python-multipart
+aiohttp
+python3-discogs-client
+spotipy
+python-dotenv
