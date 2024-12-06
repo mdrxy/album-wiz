@@ -45,6 +45,7 @@ services:
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with a custom SQL script
     environment:
       - POSTGRES_DB
+      - POSTGRES_HOST_AUTH_METHOD=trust # Don't want to use a password
     env_file:
       - .env
     networks:
