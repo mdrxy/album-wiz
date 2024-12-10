@@ -6,3 +6,4 @@ scipy
 torch
 pgvector
 sqlalchemy
+python-dotenv

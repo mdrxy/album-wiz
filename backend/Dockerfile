@@ -20,6 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the backend code to the working directory
 COPY . .
 
+# Set the PYTHONPATH environment variable
+ENV PYTHONPATH "${PYTHONPATH}:/app/"
+
 # Expose the port the application will run on
 EXPOSE 8000
 

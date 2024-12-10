@@ -7,7 +7,7 @@ This project is a companion tool for radio DJs to explore and discover vinyl rec
 The project is containerized with Docker to simplify setup and deployment. The services include:
 
 - **Frontend**: React app for user interaction.
-- **Backend**: Python (Flask/FastAPI) service for image recognition and metadata aggregation.
+- **Backend**: Python (FastAPI) service for image recognition and metadata aggregation.
 - **Database**: PostgreSQL with `pgvector` for vectorized queries. pgAdmin is available for browsing the database in the browser.
 - **Cache**: Redis for high-performance data caching.
 - **Vector Search**: Service for latent vector encoding and similarity search.
@@ -41,23 +41,26 @@ The vector search service is separated into its own service for modularity, scal
    cd album-wiz
    ```
 
-2. Set up environment variables
+2. Setup a `.env`:
 
-    Copy `.sample.env` as `.env` in the root directory of the project and input any missing values.
+    ```bash
+    cp .sample.env .env
+    ```
+
+    Enter values for `DISCOGS_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
 
 3. Build and start the containers:
 
     ```bash
-    docker compose up --build
+    docker compose up -d --build
     ```
 
+    Note: if you omit `-d`, the app will still launch and logs will be output to your terminal. However, upon pressing `CTRL-C`, the containers will stop. The `-d` flag detaches the containers and runs them in the background.
+
 4. Access the services:
-   - Frontend: <http://localhost:3000>
-   - Backend: <http://localhost:8000>
-   - pgAdmin: <http://localhost:5050>
-   - Nginx: <http://localhost>
-     - Home page: `/` (root)
-     - API: `/api`
+   - Frontend: <http://localhost/>
+   - Backend: <http://localhost/api/>
+   - pgAdmin: <http://localhost/pga/>
 
 5. Stop services
 
@@ -67,25 +70,19 @@ The vector search service is separated into its own service for modularity, scal
 
 ## Development / Contributing
 
-If you're only working on a specific service, run just the necessary containers. For instance:
+### Debugging
 
-```bash
-docker compose up backend
-```
-
-If you've made changes to a service, rebuild and restart it:
-
-```bash
-docker compose up --build backend
-```
-
-To debug a specific container, view its logs:
+To debug a specific container, view its logs, e.g.
 
 ```bash
 docker logs -f vinyl-backend
 ```
 
-`-f` attaches the logs to your terminal window and will update in real-time. Detach using `CTRL-C`.
+Note that you need to use the *container* name instead of the *service* name. Service names come from `docker-compose.yml` to refer to a component of the app's architecture. Container names are actual instances of that service. Thus, to view service logs, we want to peek into the *container* actually running the service.
+
+It's also important to note that `-f` attaches the logs to your terminal window and will update in real-time. Detach using `CTRL-C`. If `-f` is ommitted, then you will see the logs up to the point of the command being run (and nothing after).
+
+### Executing commands inside a running container
 
 To access a running container, run the following, replacing `vinyl-backend` with the name of the container (found in `docker compose.yml` or by running `docker ps`).
 
@@ -93,18 +90,30 @@ To access a running container, run the following, replacing `vinyl-backend` with
 docker exec -it vinyl-backend /bin/bash
 ```
 
+#### Shortcut: update Nginx
+
 To update the Nginx config inside the running container, make the necessary changes locally and then run:
 
 ```bash
 docker exec vinyl-nginx nginx -s reload
 ```
 
+### Building a container following changes
+
+If you've made changes to a service, rebuild and restart it:
+
+```bash
+docker compose up --build backend
+```
+
+### Running tests
+
 To run tests,
 TODO
 
 ### Frontend
 
-If changing `package.json`, don't forget to run `npm install` from the `frontend/` folder so that `package-lock.json` is updated.
+Note: if changing `package.json`, don't forget to run `npm install` from the `frontend/` folder so that `package-lock.json` is updated.
 
 ### Backend
 
