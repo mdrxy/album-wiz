@@ -1,3 +1,5 @@
+-- \c vinyl_db;
+
 -- Create the artists table to store artist metadata
 CREATE TABLE artists (
     id SERIAL PRIMARY KEY,               -- Unique identifier for the artist

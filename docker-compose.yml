@@ -31,21 +31,31 @@ services:
         max-size: "10m"
         max-file: "3"
     depends_on:
-      - database # Ensure the database container starts before the backend
-      - cache # Ensure the Redis cache container starts before the backend
+      database:
+        # Ensure the database container starts before the backend
+        condition: service_healthy
+      cache:
+        condition: service_healthy # Ensure the Redis cache container starts before the backend
     networks:
       - vinyl-network
 
   database:
+    image: postgres:15
+    container_name: vinyl-database
     build:
       context: ./database
-    container_name: vinyl-database
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with a custom SQL script
     environment:
-      - POSTGRES_DB
-      - POSTGRES_HOST_AUTH_METHOD=trust # Don't want to use a password
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vinyl_db
     env_file:
       - .env
     networks:
@@ -54,21 +64,25 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
-    environment:
-      - PGADMIN_DEFAULT_EMAIL
-      - PGADMIN_DEFAULT_PASSWORD
     env_file:
       - .env
     volumes:
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
     depends_on:
-      - database # Ensure the database container starts before pgAdmin
+      database:
+        # Ensure the database container starts before pgAdmin
+        condition: service_healthy
     networks:
       - vinyl-network
 
   cache:
     image: redis:7
     container_name: vinyl-cache
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - redis_data:/data
     networks:
