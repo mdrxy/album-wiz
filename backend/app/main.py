@@ -9,7 +9,7 @@ Each route has /api as a prefix, so the full path to the route is /api/{route}.
 import os
 import io
 import logging
-from typing import AsyncGenerator, List, float
+from typing import AsyncGenerator, List
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
@@ -23,13 +23,13 @@ from app.metadata_orchestrator import MetadataOrchestrator
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logger.info("Initializing DiscogsCollector")
+logger.info("Initializing backend")
 
 
 # Config database connection
 
 DATABASE_URL = os.getenv("DATABASE_URL")  # From docker-compose.yml
-
+MEDIA_DIR = os.getenv("MEDIA_DIR")  # /media
 
 async def lifespan(application: FastAPI) -> AsyncGenerator:
     """
@@ -119,25 +119,26 @@ async def vectorize(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-@router.get("/album")
-async def get_album(vector: List[float] = Query(...)):
-    """
-    Endpoint to receive a vector and return the most similar album.
-    """
-    logger.debug("Received vector: %s", vector)
-    # Check if the vector is valid
-    logger.warning("Vector length: %s, this API is not useable yet.", len(vector))
-    if False and len(vector) != 2048:
-        raise HTTPException(status_code=400, detail="Invalid vector length")
-    
-    try:
-        #TODO: Implement the query.get_album function
-        album = query.get_album(vector)
-        return {"message": "Album found", "album": album}
-    except HTTPException as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+# @router.get("/album")
+# async def get_album(vector: List[float] = Query(...)):
+#     """
+#     Endpoint to receive a vector and return the most similar album.
+#     """
+#     logger.debug("Received vector: %s", vector)
+#     # Check if the vector is valid
+#     logger.warning("Vector length: %s, this API is not useable yet.", len(vector))
+#     if False and len(vector) != 2048:
+#         raise HTTPException(status_code=400, detail="Invalid vector length")
+
+#     try:
+#         # TODO: Implement the query.get_album function
+#         album = query.get_album(vector)
+#         return {"message": "Album found", "album": album}
+#     except HTTPException as e:
+#         raise HTTPException(status_code=400, detail=str(e)) from e
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 app.include_router(router, prefix="/api")
