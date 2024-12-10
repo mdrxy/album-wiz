@@ -9,8 +9,8 @@ Each route has /api as a prefix, so the full path to the route is /api/{route}.
 import os
 import io
 import logging
-from typing import AsyncGenerator
-from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter
+from typing import AsyncGenerator, List, float
+from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
 
@@ -99,25 +99,41 @@ async def vectorize(file: UploadFile = File(...)):
     """
     logger.debug("Received file: %s", file.filename)
     try:
-        logger.debug("Reading file contents...")
         contents = await file.read()
         logger.debug("File contents read successfully.")
 
-        logger.debug("Opening image...")
         image = Image.open(io.BytesIO(contents))
         logger.debug("Image opened successfully.")
 
-        logger.debug("Cropping image to square...")
         square_image = normalize.crop_to_square(image)
         logger.debug("Image cropped to square successfully.")
 
-        logger.debug("Vectorizing image...")
         vector = query.vectorize(square_image)
         logger.debug("Image vectorized successfully.")
 
         logger.debug("Vector: %s", vector)
 
         return {"message": "Image successfully converted", "vector": vector.tolist()}
+    except HTTPException as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.get("/album")
+async def get_album(vector: List[float] = Query(...)):
+    """
+    Endpoint to receive a vector and return the most similar album.
+    """
+    logger.debug("Received vector: %s", vector)
+    # Check if the vector is valid
+    logger.warning("Vector length: %s, this API is not useable yet.", len(vector))
+    if False and len(vector) != 2048:
+        raise HTTPException(status_code=400, detail="Invalid vector length")
+    
+    try:
+        #TODO: Implement the query.get_album function
+        album = query.get_album(vector)
+        return {"message": "Album found", "album": album}
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
