@@ -41,7 +41,15 @@ The vector search service is separated into its own service for modularity, scal
    cd album-wiz
    ```
 
-2. Build and start the containers:
+2. Setup a `.env`:
+
+    ```bash
+    cp .sample.env .env
+    ```
+
+    Enter values for `DISCOGS_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
+
+3. Build and start the containers:
 
     ```bash
     docker compose up -d --build
@@ -49,12 +57,12 @@ The vector search service is separated into its own service for modularity, scal
 
     Note: if you omit `-d`, the app will still launch and logs will be output to your terminal. However, upon pressing `CTRL-C`, the containers will stop. The `-d` flag detaches the containers and runs them in the background.
 
-3. Access the services:
+4. Access the services:
    - Frontend: <http://localhost/>
    - Backend: <http://localhost/api/>
    - pgAdmin: <http://localhost/pga/>
 
-4. Stop services
+5. Stop services
 
     ```bash
     docker compose down
