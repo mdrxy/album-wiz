@@ -1,6 +1,9 @@
 -- Switch to the vinyl_db database
 \c vinyl_db;
 
+-- Add an extension for vectorized queries (pgvector)
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Create the artists table to store artist metadata
 CREATE TABLE artists (
     id SERIAL PRIMARY KEY,               -- Unique identifier for the artist
@@ -36,9 +39,6 @@ CREATE TABLE tracks (
     updated_at TIMESTAMP DEFAULT NOW(),  -- Last updated timestamp
     FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE
 );
-
--- Add an extension for vectorized queries (pgvector)
-CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Insert example data for testing
 INSERT INTO artists (name, genre) VALUES
