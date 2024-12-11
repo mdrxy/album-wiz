@@ -11,3 +11,4 @@ aiohttp
 python3-discogs-client
 spotipy
 python-dotenv
+musicbrainzngs

@@ -6,8 +6,8 @@ import logging
 import os
 import spotipy  # https://github.com/spotipy-dev/spotipy?tab=readme-ov-file
 from spotipy.oauth2 import SpotifyClientCredentials
-from app.collectors.base_collector import MetadataCollector
 from dotenv import load_dotenv
+from app.collectors.base import MetadataCollector
 
 
 load_dotenv()
@@ -22,7 +22,8 @@ class SpotifyCollector(MetadataCollector):
     https://developer.spotify.com/documentation/web-api
     """
 
-    def __init__(self):
+    def __init__(self, name: str):
+        super().__init__(name)
         logging.basicConfig(level=logging.DEBUG)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -37,9 +38,19 @@ class SpotifyCollector(MetadataCollector):
 
     def fetch_artist_details(self, artist_name: str) -> dict:
         """
-        Fetch artist details including genres, images, and popularity score.
+        - "name": The name of the artist
+        - "namevariations": A list of name variations for the artist
+            - Example: ["The Beatles", "Beatles"]
+        - "genres": A list of genres associated with the artist
+            - Example: ["pop", "rock"]
+        - "image": URL to an image of the artist
+            - Should be the highest quality image available
+        - "url": URL to the artist's page on the source website
+        - "popularity": A popularity score for the artist
+            - Should be a number between 0 and 100
+        - "profile": A brief description of the artist
         """
-        self.logger.info("Fetching details for artist: %s", artist_name)
+        self.logger.info("Fetching Spotify details for artist: %s", artist_name)
         results = self.client.search(
             q=f'artist:"{artist_name}"', type="artist", limit=1
         )
@@ -53,20 +64,40 @@ class SpotifyCollector(MetadataCollector):
 
         artist_details = {
             "name": artist_data["name"],
-            "genres": artist_data["genres"],
+            "namevariations": None,  # Spotify does not provide name variations
+            "genres": artist_data["genres"] if "genres" in artist_data else None,
             "image": artist_data["images"][0]["url"] if artist_data["images"] else None,
-            "popularity": artist_data["popularity"],
-            # "related_artists": [],  # Related artists data is no longer available
+            "url": artist_data["external_urls"]["spotify"],
+            "popularity": (
+                artist_data["popularity"] if "popularity" in artist_data else None
+            ),
+            "profile": None,  # Spotify does not provide artist profile
         }
 
         return artist_details
 
     def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
         """
-        Fetch album details including image, tracks, genres, and popularity.
+        - "name": The name of the album
+        - "genres": A list of genres associated with the album
+            - Example: ["pop", "rock"]
+        - "image": URL to an image of the album
+            - Should be the highest quality image available
+        - "release_date": The release date of the album
+            - Should be in the format: "YYYY-MM"
+        - "total_tracks": The total number of tracks on the album
+        - "tracks": A list of tracks
+            - Each track should be a dictionary with the following keys:
+                - "name": The name of the track
+                - "duration": The duration of the track in seconds
+                - "explicit": True if the track is explicit, False otherwise
+                    - None if the information is not available
+        - "url": URL to the album's page on the source website
+        - "popularity": A popularity score for the album
+            - Should be a number between 0 and 100
         """
         self.logger.info(
-            "Fetching album: '%s' by artist: '%s'", album_name, artist_name
+            "Fetching Spotify album: '%s' by artist: '%s'", album_name, artist_name
         )
         results = self.client.search(
             q=f'album:"{album_name}" artist:"{artist_name}"', type="album", limit=1
@@ -89,26 +120,37 @@ class SpotifyCollector(MetadataCollector):
             {
                 "name": track["name"],
                 "duration_seconds": track["duration_ms"] / 1000,
-                "explicit": track["explicit"],
+                "explicit": track["explicit"] if "explicit" in track else None,
             }
             for track in tracks_data.get("items", [])
         ]
         self.logger.info("Fetched %d tracks for album id: %s", len(tracks), album_id)
 
         album_details = {
-            # "album_type": album_data["album_type"], -- found incorrect data
-            "total_tracks": album_data["total_tracks"],
-            # "available_markets": album_data["available_markets"], -- too many to deal with
-            "spotify_url": album_data["external_urls"]["spotify"],
-            # "href": album_data["href"], -- this is the API url
-            "id": album_data["id"],
-            "image": album_data["images"][0]["url"] if album_data["images"] else None,
             "name": album_data["name"],
-            "release_date": album_data["release_date"],
-            "release_date_precision": album_data["release_date_precision"],
-            "artists": [artist["name"] for artist in album_data["artists"]],
+            "genres": None,  # Spotify does not provide genres
+            "image": album_data["images"][0]["url"] if album_data["images"] else None,
+            "total_tracks": album_data["total_tracks"],
             "tracks": tracks,
+            "url": (
+                album_data["external_urls"]["spotify"]
+                if "spotify" in album_data["external_urls"]
+                else None
+            ),
+            "popularity": None,  # Spotify does not provide popularity for albums anymore
         }
+
+        # Releast date should be in the format: "YYYY-MM"
+        release_date = album_data["release_date"]
+        release_date_precision = album_data["release_date_precision"]
+        # Standardize release date format to "YYYY-MM"
+        if release_date_precision == "day":
+            release_date = release_date[:7]  # Extract "YYYY-MM" from "YYYY-MM-DD"
+        elif release_date_precision == "month":
+            release_date = release_date[:7]  # Already "YYYY-MM"
+        elif release_date_precision == "year":
+            release_date = f"{release_date}-01"  # Append "-01" for January
+        album_details["release_date"] = release_date
 
         self.logger.info(
             "Fetched album details for '%s' by '%s'", album_name, artist_name
@@ -133,20 +175,9 @@ class SpotifyCollector(MetadataCollector):
         artist_details = self.fetch_artist_details(artist_name)
         album_details = self.fetch_album_details(artist_name, album_name)
 
-        # if album_details.get("artists") and artist_name not in album_details["artists"]:
-        #     self.logger.warning(
-        #         "Artist name mismatch. Expected: %s, Found: %s",
-        #         artist_name,
-        #         album_details["artists"],
-        #     )
-        # else:
-        #     # Remove artist name from album artists list since it's redundant
-        #     # We only want this field to contain other artists on the album
-        #     album_details["artists"].remove(artist_name)
-
         metadata = {
             "artist": artist_details,
             "album": album_details,
         }
-
+        self.logger.debug("Spotify metadata fetched: %s", metadata)
         return metadata

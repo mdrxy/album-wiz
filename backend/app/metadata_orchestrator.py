@@ -5,8 +5,9 @@ collection to the respective collectors.
 """
 
 import logging
-from app.collectors.spotify_collector import SpotifyCollector
-from app.collectors.discogs_collector import DiscogsCollector
+from app.collectors.spotify import SpotifyCollector
+from app.collectors.discogs import DiscogsCollector
+from app.collectors.musicbrainz import MusicBrainzCollector
 
 
 class MetadataOrchestrator:
@@ -22,9 +23,9 @@ class MetadataOrchestrator:
         self.logger.info("MetadataOrchestrator initialized")
 
         self.collectors = [
-            SpotifyCollector(),
-            DiscogsCollector(),
-            # Add future collectors
+            SpotifyCollector("spotify"),
+            DiscogsCollector("discogs"),
+            MusicBrainzCollector("musicbrainz"),
         ]
 
     async def collect_metadata(self, query: str) -> dict:
@@ -47,13 +48,16 @@ class MetadataOrchestrator:
                 self.logger.info(
                     "Collecting metadata using %s", collector.__class__.__name__
                 )
+
+                data = {f"{collector.get_name()}": {}}
                 source_metadata = await collector.fetch_metadata(query)
                 if "error" not in source_metadata:
-                    metadata.update(source_metadata)
+                    data[f"{collector.get_name()}"].update(source_metadata)
                     self.logger.info(
                         "Successfully collected metadata from %s",
                         collector.__class__.__name__,
                     )
+                    metadata.update(data)
                 else:
                     self.logger.warning(
                         "Error in metadata from %s: %s",
