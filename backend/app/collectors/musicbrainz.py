@@ -295,7 +295,7 @@ class MusicBrainzCollector(MetadataCollector):
 
         metadata = {
             "artist": artist_details,
-            "album": album_details,
+            "album": album_details if album_details else None,
         }
         self.logger.debug("MusicBrainz metadata fetched: %s", metadata)
         return metadata

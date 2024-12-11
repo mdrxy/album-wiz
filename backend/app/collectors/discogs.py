@@ -277,7 +277,7 @@ class DiscogsCollector(MetadataCollector):
 
         metadata = {
             "artist": artist_details,
-            "album": album_details,
+            "album": album_details if album_details else None,
         }
         self.logger.debug("Discogs metadata fetched: %s", metadata)
         return metadata

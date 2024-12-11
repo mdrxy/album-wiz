@@ -125,7 +125,7 @@ class SpotifyCollector(MetadataCollector):
         tracks = [
             {
                 "name": track["name"],
-                "duration_seconds": track["duration_ms"] / 1000,
+                "duration": int(track["duration_ms"] / 1000),
                 "explicit": track["explicit"] if "explicit" in track else None,
             }
             for track in tracks_data.get("items", [])
@@ -183,7 +183,7 @@ class SpotifyCollector(MetadataCollector):
 
         metadata = {
             "artist": artist_details,
-            "album": album_details,
+            "album": album_details if album_details else None,
         }
         self.logger.debug("Spotify metadata fetched: %s", metadata)
         return metadata
