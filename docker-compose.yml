@@ -2,15 +2,21 @@ services:
   frontend:
     build:
       context: ./frontend # The local path to the frontend source code
+      target: ${BUILD_TARGET:-production}
     container_name: vinyl-frontend
+    ports:
+      - "3000:3000" # Map dev server port to host machine
     volumes:
       - ./frontend:/app # Mounts the local frontend directory into the container for development (real-time changes)
+      - /app/node_modules # Prevents the node_modules directory from being overridden by the container
     environment:
       # Variables that can be accessed in the frontend application
       - REACT_APP_API_BASE_URL
       - CHOKIDAR_USEPOLLING
     env_file:
       - .env
+    depends_on:
+      - backend
     networks:
       - vinyl-network # Putting all services in the same network for inter-container communication
 
@@ -18,18 +24,17 @@ services:
     build:
       context: ./backend
     container_name: vinyl-backend
+    ports:
+      - "8000:8000" # Map the backend port to the host machine
     volumes:
       - ./backend:/app
+      - ./media:/media # Shared volume for album art and other media files
     environment:
       - DATABASE_URL
       - REDIS_URL
+      - MEDIA_DIR=/media # Environment variable for the media directory path
     env_file:
       - .env
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     depends_on:
       database:
         # Ensure the database container starts before the backend
@@ -92,6 +97,8 @@ services:
     build:
       context: ./vector-search
     container_name: vinyl-vector-search
+    volumes:
+      - ./media:/media # Shared volume for accessing media files during vector processing
     environment:
       - DATABASE_URL
     env_file:
@@ -118,8 +125,9 @@ services:
 
 volumes:
   postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
-  redis_data:
-    # Define a persistent volume for the Redis cache
+  redis_data: # Persistent volume for the Redis cache
+  media: # Shared volume for storing album art
+    driver: local
 
 networks:
   vinyl-network:

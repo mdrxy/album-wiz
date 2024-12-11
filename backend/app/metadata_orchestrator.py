@@ -5,8 +5,9 @@ collection to the respective collectors.
 """
 
 import logging
-from app.collectors.spotify_collector import SpotifyCollector
-from app.collectors.discogs_collector import DiscogsCollector
+from app.collectors.spotify import SpotifyCollector
+from app.collectors.discogs import DiscogsCollector
+from app.collectors.musicbrainz import MusicBrainzCollector
 
 
 class MetadataOrchestrator:
@@ -22,50 +23,53 @@ class MetadataOrchestrator:
         self.logger.info("MetadataOrchestrator initialized")
 
         self.collectors = [
-            SpotifyCollector(),
-            DiscogsCollector(),
-            # Add future collectors
+            SpotifyCollector("spotify"),
+            DiscogsCollector("discogs"),
+            MusicBrainzCollector("musicbrainz"),
         ]
 
-    async def collect_metadata(self, query: str) -> dict:
+    async def collect_metadata(self, source: str, query: str) -> dict:
         """
-        Collect metadata for a given album or artist query using all available
-        collectors.
+        Collect metadata for a given album or artist query using a specific collector.
 
         Args:
-        - query (str): The query to search for. This should probably be in the
-            format: "{artist} - {album}".
+        - source (str): The name of the collector to use.
+        - query (str): The query to search for, in the format: "{artist} - {album}".
 
         Returns:
-        - dict: A dictionary containing the metadata from all available
-            collectors. Each key is the name of the collector, and the value
-            is the metadata returned by that collector.
+        - dict: A dictionary containing the metadata from the specified collector.
         """
         metadata = {}
-        for collector in self.collectors:
-            try:
+        collector = next((c for c in self.collectors if c.get_name() == source), None)
+        if collector is None:
+            self.logger.error("Collector %s not found", source)
+            return {"error": f"Collector {source} not found"}
+
+        try:
+            self.logger.info(
+                "Collecting metadata using %s", collector.__class__.__name__
+            )
+            source_metadata = await collector.fetch_metadata(query)
+            if "error" not in source_metadata:
+                metadata[collector.get_name()] = source_metadata
                 self.logger.info(
-                    "Collecting metadata using %s", collector.__class__.__name__
-                )
-                source_metadata = await collector.fetch_metadata(query)
-                if "error" not in source_metadata:
-                    metadata.update(source_metadata)
-                    self.logger.info(
-                        "Successfully collected metadata from %s",
-                        collector.__class__.__name__,
-                    )
-                else:
-                    self.logger.warning(
-                        "Error in metadata from %s: %s",
-                        collector.__class__.__name__,
-                        source_metadata["error"],
-                    )
-            except (ConnectionError, TimeoutError, ValueError) as e:
-                error_message = str(e)
-                metadata[f"error_{collector.__class__.__name__}"] = error_message
-                self.logger.error(
-                    "Failed to collect metadata from %s: %s",
+                    "Successfully collected metadata from %s",
                     collector.__class__.__name__,
-                    error_message,
                 )
+            else:
+                self.logger.warning(
+                    "Error in metadata from %s: %s",
+                    collector.__class__.__name__,
+                    source_metadata["error"],
+                )
+                metadata["error"] = source_metadata["error"]
+        except (ConnectionError, TimeoutError, ValueError) as e:
+            error_message = str(e)
+            metadata["error"] = error_message
+            self.logger.error(
+                "Failed to collect metadata from %s: %s",
+                collector.__class__.__name__,
+                error_message,
+            )
+
         return metadata

@@ -1,11 +1,11 @@
 FROM postgres:15
 
-# Install pgvector extension
-RUN apt-get update && apt-get install -y postgresql-server-dev-15 build-essential git \
-    && git clone https://github.com/pgvector/pgvector.git \
-    && cd pgvector && make && make install \
-    && cd .. && rm -rf pgvector \
-    && apt-get remove -y build-essential git && apt-get autoremove -y && apt-get clean
+# Add the PostgreSQL apt repository and install pgvector
+RUN apt-get update && apt-get install -y wget gnupg && \
+    wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    apt-get update && apt-get install -y postgresql-15-pgvector && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy initialization scripts if needed
+# Copy initialization scripts
 COPY ./init.sql /docker-entrypoint-initdb.d/
