@@ -115,6 +115,16 @@ TODO
 
 Note: if changing `package.json`, don't forget to run `npm install` from the `frontend/` folder so that `package-lock.json` is updated.
 
+```sh
+export BUILD_TARGET=development
+docker-compose up --build
+```
+
+```sh
+export BUILD_TARGET=production
+docker-compose up --build
+```
+
 ### Backend
 
 ### Database
