@@ -152,9 +152,12 @@ async def get_metadata(
     search_query: str,
     source: Optional[str] = Query(None),
     compare: Optional[bool] = Query(False),
+    include_all: Optional[bool] = Query(False),
 ):
     """
     Collect metadata for a record, either from all sources or specific sources.
+
+    NOTE: if only one source returns the album, the album data will return as "identical".
 
     Args:
     - search_query (str): The query to search for, in the format "{artist} - {album}".
@@ -167,6 +170,22 @@ async def get_metadata(
     - dict: Metadata from the specified source(s), or a comparison highlighting differences
         if applicable.
     """
+    # Validate that the search query is not empty and is in the correct format
+    if not search_query:
+        raise HTTPException(status_code=400, detail="Search query cannot be empty.")
+
+    # Validate {artist} - {album} format with content on both sides of the hyphen
+    if " - " not in search_query or not all(
+        part.strip() for part in search_query.split(" - ", 1)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Search query must be in the format '{artist} - {album}', "
+                "with content on both sides of the hyphen."
+            ),
+        )
+
     try:
         available_sources = [
             collector.get_name() for collector in orchestrator.collectors
@@ -209,6 +228,14 @@ async def get_metadata(
                     differences[field] = source_values  # Fields with differences
                 else:
                     identical[field] = next(iter(unique_values))  # Single unique value
+
+            if not include_all:
+                # Don't care about fields that will always be different
+                differences.pop("artist.image", None)
+                differences.pop("artist.url", None)
+                differences.pop("artist.popularity", None)
+                differences.pop("album.image", None)
+                differences.pop("album.url", None)
 
             return {
                 "query": search_query,
