@@ -9,7 +9,7 @@ Each route has /api as a prefix, so the full path to the route is /api/{route}.
 import os
 import io
 import logging
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
@@ -31,6 +31,7 @@ logger.info("Initializing backend")
 DATABASE_URL = os.getenv("DATABASE_URL")  # From docker-compose.yml
 MEDIA_DIR = os.getenv("MEDIA_DIR")  # /media
 
+
 async def lifespan(application: FastAPI) -> AsyncGenerator:
     """
     Database connection pool setup and teardown.
@@ -50,8 +51,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator:
 # Initialize FastAPI application
 app = FastAPI(lifespan=lifespan)
 
-orchestrator = MetadataOrchestrator()
 router = APIRouter()
+orchestrator = MetadataOrchestrator()
 
 
 @router.get("/")
@@ -80,13 +81,157 @@ async def get_table_data(table_name: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/metadata/{search_query}")
-async def get_metadata(search_query: str):
+def hashify(value):
     """
-    Collect metadata for a record from multiple sources.
+    Recursively convert dictionaries and lists into tuples so that the value is hashable.
+    - dict -> tuple of (key, value) pairs sorted by key
+    - list -> tuple of hashified elements
+
+    Needed for comparison of metadata fields.
+    """
+    if isinstance(value, dict):
+        # Sort by keys to ensure consistent ordering
+        return tuple((k, hashify(v)) for k, v in sorted(value.items()))
+    if isinstance(value, list):
+        return tuple(hashify(v) for v in value)
+    return value  # Scalars (str, int, etc.) are already hashable
+
+
+def _flatten_dict(d: dict, parent_key: str = "", sep: str = ".") -> dict:
+    """
+    Flatten a nested dictionary for easier comparison of metadata fields.
+    """
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(_flatten_dict(v, new_key, sep=sep).items())
+        elif isinstance(v, list):
+            # Convert lists to tuples after we've done all flattening
+            # We'll just store them as-is and let hashify handle them
+            items.append((new_key, v))
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def _merge_metadata(metadata: dict) -> dict:
+    """
+    Merge metadata from multiple sources into a single dictionary.
+    """
+    merged = {}
+    for _source, source_metadata in metadata.items():
+        for key, value in source_metadata.items():
+            if key not in merged:
+                merged[key] = value
+            else:
+                # If the key already exists, we can decide how to handle conflicts
+                # For simplicity, we'll just overwrite with the latest value
+                merged[key] = value
+    return merged
+
+
+def _group_by_field(metadata: dict) -> dict:
+    """
+    Group metadata fields by their values across different sources.
+    """
+    grouped = {}
+    for source, source_metadata in metadata.items():
+        if isinstance(source_metadata, dict):
+            flattened = _flatten_dict(source_metadata)
+            for key, value in flattened.items():
+                if key not in grouped:
+                    grouped[key] = {}
+                # Convert the value into a hashable form
+                grouped[key][source] = hashify(value)
+    return grouped
+
+
+@router.get("/metadata/{search_query}")
+async def get_metadata(
+    search_query: str,
+    source: Optional[str] = Query(None),
+    compare: Optional[bool] = Query(False),
+):
+    """
+    Collect metadata for a record, either from all sources or specific sources.
+
+    Args:
+    - search_query (str): The query to search for, in the format "{artist} - {album}".
+    - source (str, optional): Comma-separated list of sources to collect metadata from.
+        If None, collect from all sources.
+    - compare (bool, optional): If True and multiple sources are queried, highlight differences
+        between sources.
+
+    Returns:
+    - dict: Metadata from the specified source(s), or a comparison highlighting differences
+        if applicable.
     """
     try:
-        metadata = await orchestrator.collect_metadata(search_query)
+        if source:
+            # Parse comma-separated sources into a list
+            sources = [s.strip() for s in source.split(",")]
+            metadata = {}
+
+            for src in sources:
+                metadata[src] = await orchestrator.collect_metadata(src, search_query)
+
+            if len(sources) == 1:
+                # If only one source, return metadata directly
+                return {
+                    "query": search_query,
+                    "source": sources[0],
+                    "metadata": metadata[sources[0]],
+                }
+
+            # If multiple sources and compare is requested
+            if compare:
+                differences = {}
+                identical = {}
+                combined_metadata = _merge_metadata(metadata)
+                for field, source_values in _group_by_field(combined_metadata).items():
+                    unique_values = set(source_values.values())
+                    if len(unique_values) > 1:
+                        differences[field] = source_values  # Fields with differences
+                    else:
+                        identical[field] = next(
+                            iter(unique_values)
+                        )  # Single unique value
+
+                return {
+                    "query": search_query,
+                    "sources": sources,
+                    "compare": True,
+                    "differences": differences,
+                    "identical": identical,
+                }
+
+            # Flattening the dictionary since each source nests itself (idk why)
+            for src, src_metadata in metadata.items():
+                metadata[src] = _merge_metadata(src_metadata)
+
+            return {"query": search_query, "sources": sources, "metadata": metadata}
+
+        # Collect metadata from all sources if no specific sources are provided
+        metadata = await orchestrator.collect_all_metadata(search_query)
+
+        if compare:
+            differences = {}
+            identical = {}
+            for field, source_values in _group_by_field(metadata).items():
+                unique_values = set(source_values.values())
+                if len(unique_values) > 1:
+                    differences[field] = source_values  # Fields with differences
+                else:
+                    identical[field] = next(iter(unique_values))  # Single unique value
+
+            return {
+                "query": search_query,
+                "compare": True,
+                "differences": differences,
+                "identical": identical,
+            }
+
         return {"query": search_query, "metadata": metadata}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
