@@ -168,57 +168,42 @@ async def get_metadata(
         if applicable.
     """
     try:
-        if source:
-            # Parse comma-separated sources into a list
-            sources = [s.strip() for s in source.split(",")]
-            metadata = {}
+        available_sources = [
+            collector.get_name() for collector in orchestrator.collectors
+        ]
 
-            for src in sources:
-                metadata[src] = await orchestrator.collect_metadata(src, search_query)
+        sources = (
+            [s.strip() for s in source.split(",")] if source else available_sources
+        )
+        # Check for invalid sources
+        invalid_sources = [src for src in sources if src not in available_sources]
+        if invalid_sources:
+            logger.warning("Invalid sources requested: %s", invalid_sources)
+            return {
+                "message": "Some sources are invalid.",
+                "invalid_sources": invalid_sources,
+                "available_sources": available_sources,
+            }
 
-            if len(sources) == 1:
-                # If only one source, return metadata directly
-                return {
-                    "query": search_query,
-                    "source": sources[0],
-                    "metadata": metadata[sources[0]],
-                }
+        metadata = {}
 
-            # If multiple sources and compare is requested
-            if compare:
-                differences = {}
-                identical = {}
-                combined_metadata = _merge_metadata(metadata)
-                for field, source_values in _group_by_field(combined_metadata).items():
-                    unique_values = set(source_values.values())
-                    if len(unique_values) > 1:
-                        differences[field] = source_values  # Fields with differences
-                    else:
-                        identical[field] = next(
-                            iter(unique_values)
-                        )  # Single unique value
+        for src in sources:
+            metadata[src] = await orchestrator.collect_metadata(src, search_query)
 
-                return {
-                    "query": search_query,
-                    "sources": sources,
-                    "compare": True,
-                    "differences": differences,
-                    "identical": identical,
-                }
-
-            # Flattening the dictionary since each source nests itself (idk why)
-            for src, src_metadata in metadata.items():
-                metadata[src] = _merge_metadata(src_metadata)
-
-            return {"query": search_query, "sources": sources, "metadata": metadata}
-
-        # Collect metadata from all sources if no specific sources are provided
-        metadata = await orchestrator.collect_all_metadata(search_query)
+        if len(sources) == 1:
+            # If only one source, return metadata directly
+            return {
+                "query": search_query,
+                "source": sources[0],
+                "metadata": metadata[sources[0]],
+            }
 
         if compare:
+            # Compare metadata across multiple sources
             differences = {}
             identical = {}
-            for field, source_values in _group_by_field(metadata).items():
+            combined_metadata = _merge_metadata(metadata)
+            for field, source_values in _group_by_field(combined_metadata).items():
                 unique_values = set(source_values.values())
                 if len(unique_values) > 1:
                     differences[field] = source_values  # Fields with differences
@@ -227,12 +212,18 @@ async def get_metadata(
 
             return {
                 "query": search_query,
+                "sources": sources,
                 "compare": True,
                 "differences": differences,
                 "identical": identical,
             }
 
-        return {"query": search_query, "metadata": metadata}
+        # Flatten nested metadata dictionaries
+        for src, src_metadata in metadata.items():
+            metadata[src] = _merge_metadata(src_metadata)
+
+        return {"query": search_query, "sources": sources, "metadata": metadata}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
