@@ -214,8 +214,6 @@ class MusicBrainzCollector(MetadataCollector):
                 - "explicit": True if the track is explicit, False otherwise
                     - None if the information is not available
         - "url": URL to the album's page on the source website
-        - "popularity": A popularity score for the album
-            - Should be a number between 0 and 100
         """
         self.logger.info(
             "Fetching MusicBrainz album: '%s' by artist: '%s'", album_name, artist_name
@@ -240,16 +238,20 @@ class MusicBrainzCollector(MetadataCollector):
             "name": release_data["title"],
             "genres": release_data.get("tag-list", None) or None,
             "image": self.fetch_album_cover_art(release_data),
-            "total_tracks": None,  # Requires additional query for tracklist
-            "tracks": None,  # Requires additional query for tracklist
+            "total_tracks": None,  # Additional query below for tracklist
+            "tracks": None,
             "url": f"https://musicbrainz.org/release/{release_data['id']}",
-            "popularity": None,  # NOTE: MusicBrainz does not provide popularity info
         }
 
         # Releast date should be in the format: "YYYY-MM"
         release_date = release_data.get("date", None)
         release_date = release_date[:7]  # Extract "YYYY-MM" from "YYYY-MM-DD"
         album_details["release_date"] = release_date
+
+        # Check for YYYY only
+        if len(release_date) == 4:
+            # Append -01 to make it "YYYY-MM"
+            album_details["release_date"] += "-01"
 
         # Fetch detailed release information to get tracklist
         try:

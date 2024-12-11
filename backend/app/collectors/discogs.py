@@ -159,8 +159,6 @@ class DiscogsCollector(MetadataCollector):
                 - "explicit": True if the track is explicit, False otherwise
                     - None if the information is not available
         - "url": URL to the album's page on the source website
-        - "popularity": A popularity score for the album
-            - Should be a number between 0 and 100
         """
         self.logger.info(
             "Fetching Discogs album: '%s' by artist: '%s'", album_name, artist_name
@@ -219,7 +217,6 @@ class DiscogsCollector(MetadataCollector):
             "genres": release.genres if release.genres else None,
             "image": release.images[0]["uri"] if release.images else None,
             "url": release.url,
-            "popularity": None,  # Discogs does not provide popularity
         }
 
         # Get release date in the format "YYYY-MM"

@@ -81,6 +81,25 @@ async def get_table_data(table_name: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.post("/db/resolve")
+async def upload_resolution(data: dict):
+    """
+    Accept resolved metadata and store it in the database.
+    """
+    try:
+        async with app.state.pool.acquire() as connection:
+            sql_query = """
+                INSERT INTO resolved_metadata (search_query, resolution)
+                VALUES ($1, $2)
+                ON CONFLICT (search_query) DO UPDATE
+                SET resolution = EXCLUDED.resolution
+            """
+            await connection.execute(sql_query, data["query"], data["resolution"])
+        return {"message": "Resolution uploaded successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 def hashify(value):
     """
     Recursively convert dictionaries and lists into tuples so that the value is hashable.
@@ -213,7 +232,7 @@ async def get_metadata(
             # If only one source, return metadata directly
             return {
                 "query": search_query,
-                "source": sources[0],
+                "sources": sources[0],
                 "metadata": metadata[sources[0]],
             }
 
@@ -231,10 +250,10 @@ async def get_metadata(
 
             if not include_all:
                 # Don't care about fields that will always be different
-                differences.pop("artist.image", None)
+                # differences.pop("artist.image", None)
                 differences.pop("artist.url", None)
                 differences.pop("artist.popularity", None)
-                differences.pop("album.image", None)
+                # differences.pop("album.image", None)
                 differences.pop("album.url", None)
 
             return {
@@ -253,6 +272,15 @@ async def get_metadata(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/meta-sources")
+async def get_sources():
+    """
+    Retrieve the list of available metadata sources.
+    """
+    sources = [collector.get_name() for collector in orchestrator.collectors]
+    return {"sources": sources}
 
 
 @router.post("/query")
