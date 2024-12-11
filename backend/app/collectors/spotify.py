@@ -42,13 +42,14 @@ class SpotifyCollector(MetadataCollector):
         - "namevariations": A list of name variations for the artist
             - Example: ["The Beatles", "Beatles"]
         - "genres": A list of genres associated with the artist
+            - Returns the top 5
             - Example: ["pop", "rock"]
         - "image": URL to an image of the artist
             - Should be the highest quality image available
         - "url": URL to the artist's page on the source website
         - "popularity": A popularity score for the artist
             - Should be a number between 0 and 100
-        - "profile": A brief description of the artist
+        - "profile": A brief description of the artist (HTML)
         """
         self.logger.info("Fetching Spotify details for artist: %s", artist_name)
         results = self.client.search(
@@ -61,17 +62,21 @@ class SpotifyCollector(MetadataCollector):
             return {}
 
         artist_data = artists[0]
+        genres = artist_data["genres"] if "genres" in artist_data else None
+        # Filter to first (top) 5 genres
+        if genres:
+            genres = genres[:5]
 
         artist_details = {
             "name": artist_data["name"],
-            "namevariations": None,  # Spotify does not provide name variations
-            "genres": artist_data["genres"] if "genres" in artist_data else None,
+            "namevariations": None,  # NOTE: Spotify does not provide name variations
+            "genres": genres if genres else None,
             "image": artist_data["images"][0]["url"] if artist_data["images"] else None,
             "url": artist_data["external_urls"]["spotify"],
             "popularity": (
                 artist_data["popularity"] if "popularity" in artist_data else None
             ),
-            "profile": None,  # Spotify does not provide artist profile
+            "profile": None,  # NOTE: Spotify does not provide artist profile text
         }
 
         return artist_details
@@ -80,6 +85,7 @@ class SpotifyCollector(MetadataCollector):
         """
         - "name": The name of the album
         - "genres": A list of genres associated with the album
+            - Returns the top 5
             - Example: ["pop", "rock"]
         - "image": URL to an image of the album
             - Should be the highest quality image available
@@ -128,7 +134,7 @@ class SpotifyCollector(MetadataCollector):
 
         album_details = {
             "name": album_data["name"],
-            "genres": None,  # Spotify does not provide genres
+            "genres": None,  # NOTE: Spotify does not provide album genres
             "image": album_data["images"][0]["url"] if album_data["images"] else None,
             "total_tracks": album_data["total_tracks"],
             "tracks": tracks,
@@ -137,7 +143,7 @@ class SpotifyCollector(MetadataCollector):
                 if "spotify" in album_data["external_urls"]
                 else None
             ),
-            "popularity": None,  # Spotify does not provide popularity for albums anymore
+            "popularity": None,  # NOTE: Spotify does not provide popularity for albums anymore
         }
 
         # Releast date should be in the format: "YYYY-MM"

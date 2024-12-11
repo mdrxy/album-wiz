@@ -77,18 +77,18 @@ class DiscogsCollector(MetadataCollector):
 
     def fetch_artist_details(self, artist_name: str) -> dict:
         """
-        Subkeys for artist metadata:
         - "name": The name of the artist
         - "namevariations": A list of name variations for the artist
             - Example: ["The Beatles", "Beatles"]
         - "genres": A list of genres associated with the artist
+            - Returns the top 5
             - Example: ["pop", "rock"]
         - "image": URL to an image of the artist
             - Should be the highest quality image available
         - "url": URL to the artist's page on the source website
         - "popularity": A popularity score for the artist
             - Should be a number between 0 and 100
-        - "profile": A brief description of the artist
+        - "profile": A brief description of the artist (HTML)
         """
         self.logger.info("Fetching Discogs details for artist: %s", artist_name)
 
@@ -125,10 +125,27 @@ class DiscogsCollector(MetadataCollector):
 
         return artist_details
 
+    def find_release_date(self, releases: list) -> str:
+        """
+        Find the release date of the earliest release in a list of releases.
+        """
+        release_dates = []
+        for release in releases:
+            release_date = release.year
+            if release_date != "0" and release_date is not None:
+                release_date = str(release_date) + "-01"
+                release_dates.append(release_date)
+        if release_dates:
+            # Delete all `0-01` entries
+            release_dates = [date for date in release_dates if date != "0-01"]
+            return min(release_dates)
+        return None
+
     def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
         """
         - "name": The name of the album
         - "genres": A list of genres associated with the album
+            - Returns the top 5
             - Example: ["pop", "rock"]
         - "image": URL to an image of the album
             - Should be the highest quality image available
@@ -162,7 +179,29 @@ class DiscogsCollector(MetadataCollector):
             )
             return {}
 
-        release = releases[0]
+        # Filter releases to find the first CD release
+        cd_releases = [
+            release
+            for release in releases
+            if any(fmt["name"].lower() == "cd" for fmt in release.formats)
+        ]
+
+        if not cd_releases:
+            self.logger.warning(
+                "No CD release found for '%s' by '%s'", album_name, artist_name
+            )
+            return {}
+
+        # Sort CD releases by year to find the earliest one
+        def get_release_year(release):
+            try:
+                return int(release.year)
+            except (TypeError, ValueError):
+                return float("inf")  # Assign infinity if year is invalid or None
+
+        first_cd_release = min(cd_releases, key=get_release_year)
+
+        release = first_cd_release
         album_title = release.title
 
         # Check if the album title starts with the artist's name followed by a delimiter
@@ -185,8 +224,17 @@ class DiscogsCollector(MetadataCollector):
 
         # Get release date in the format "YYYY-MM"
         release_date = str(release.year)
-        release_date += "-01"
-        album_details["release_date"] = release_date if release_date else None
+        if release_date != "0" and release_date is not None:
+            release_date += "-01"
+            album_details["release_date"] = release_date
+        else:
+            album_details["release_date"] = None
+
+        if not album_details["release_date"]:
+            self.logger.warning(
+                "Falling back to finding release date from all releases"
+            )
+            album_details["release_date"] = self.find_release_date(releases)
 
         # Get total number of tracks
         album_details["total_tracks"] = len(release.tracklist)

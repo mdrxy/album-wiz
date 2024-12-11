@@ -54,17 +54,19 @@ class MetadataCollector(ABC):
         - "namevariations": A list of name variations for the artist
             - Example: ["The Beatles", "Beatles"]
         - "genres": A list of genres associated with the artist
+            - Returns the top 5
             - Example: ["pop", "rock"]
         - "image": URL to an image of the artist
             - Should be the highest quality image available
         - "url": URL to the artist's page on the source website
         - "popularity": A popularity score for the artist
             - Should be a number between 0 and 100
-        - "profile": A brief description of the artist
+        - "profile": A brief description of the artist (HTML)
 
         Subkeys for album metadata:
         - "name": The name of the album
         - "genres": A list of genres associated with the album
+            - Returns the top 5
             - Example: ["pop", "rock"]
         - "image": URL to an image of the album
             - Should be the highest quality image available
