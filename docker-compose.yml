@@ -20,9 +20,11 @@ services:
     container_name: vinyl-backend
     volumes:
       - ./backend:/app
+      - ./media:/media # Shared volume for album art and other media files
     environment:
       - DATABASE_URL
       - REDIS_URL
+      - MEDIA_DIR=/media # Environment variable for the media directory path
     env_file:
       - .env
     logging:
@@ -92,6 +94,8 @@ services:
     build:
       context: ./vector-search
     container_name: vinyl-vector-search
+    volumes:
+      - ./media:/media # Shared volume for accessing media files during vector processing
     environment:
       - DATABASE_URL
     env_file:
@@ -118,8 +122,9 @@ services:
 
 volumes:
   postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
-  redis_data:
-    # Define a persistent volume for the Redis cache
+  redis_data: # Persistent volume for the Redis cache
+  media: # Shared volume for storing album art
+    driver: local
 
 networks:
   vinyl-network:
