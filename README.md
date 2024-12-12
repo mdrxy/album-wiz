@@ -47,7 +47,11 @@ The vector search service is separated into its own service for modularity, scal
     cp .sample.env .env
     ```
 
-    Enter values for `DISCOGS_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
+    Enter values for `DISCOGS_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`.
+
+    Get a Discogs token by making a Discogs account and then [generating a personal access token](discogs.com/settings/developers).
+
+    Get Spotify Client ID and secrets by making an app in their [developer dashboard](https://developer.spotify.com/).
 
 3. Build and start the containers:
 
@@ -58,21 +62,24 @@ The vector search service is separated into its own service for modularity, scal
     Note: if you omit `-d`, the app will still launch and logs will be output to your terminal. However, upon pressing `CTRL-C`, the containers will stop. The `-d` flag detaches the containers and runs them in the background.
 
 4. Access the services:
-   - Frontend: <http://localhost/>
+   - Frontend (production): <http://localhost/>
+   - Frontend (development): <http://localhost:3000/>
    - Backend: <http://localhost/api/>
    - pgAdmin: <http://localhost/pga/>
 
-5. Stop services
+5. Stop all services
 
     ```bash
     docker compose down
     ```
 
+    Note: this command must be ran from the project's top level directory (album-wiz/).
+
 ## Development / Contributing
 
 ### Debugging
 
-To debug a specific container, view its logs, e.g.
+To debug a specific container, you can view its logs:
 
 ```bash
 docker logs -f vinyl-backend
@@ -92,7 +99,7 @@ docker exec -it vinyl-backend /bin/bash
 
 #### Shortcut: update Nginx
 
-To update the Nginx config inside the running container, make the necessary changes locally and then run:
+To update the Nginx config, make the necessary changes locally and then run:
 
 ```bash
 docker exec vinyl-nginx nginx -s reload
@@ -100,7 +107,7 @@ docker exec vinyl-nginx nginx -s reload
 
 ### Building a container following changes
 
-If you've made changes to a service, rebuild and restart it:
+If you've made changes to a service, rebuild and restart it. Example for `backend`:
 
 ```bash
 docker compose up --build backend
@@ -113,23 +120,36 @@ TODO
 
 ### Frontend
 
-Note: if changing `package.json`, don't forget to run `npm install` from the `frontend/` folder so that `package-lock.json` is updated.
+Note: if changing `package.json`, don't forget to run `npm install` from the `frontend/` folder so that `package-lock.json` is updated!
+
+```sh
+cd frontend
+npm install
+```
+
+Run the frontend in different environments:
 
 ```sh
 export BUILD_TARGET=development
-docker-compose up --build
+docker-compose up --build frontend
 ```
 
 ```sh
 export BUILD_TARGET=production
-docker-compose up --build
+docker-compose up --build frontend
 ```
 
 ### Backend
 
+Ensure changes to the backend are reflected by rebuilding it:
+
+```sh
+docker-compose up --build backend
+```
+
 ### Database
 
-If you need to make changes to the database schema, edit `database/init.sql`.
+To modify the database schema, edit `database/init.sql` and restart the database container.
 
 ### Vector Search
 
