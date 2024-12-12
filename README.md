@@ -85,7 +85,7 @@ To debug a specific container, you can view its logs:
 docker logs -f vinyl-backend
 ```
 
-Note that you need to use the *container* name instead of the *service* name. Service names come from `docker-compose.yml` to refer to a component of the app's architecture. Container names are actual instances of that service. Thus, to view service logs, we want to peek into the *container* actually running the service.
+Note that you need to use the *container* name instead of the *service* name. Service names come from `docker compose.yml` to refer to a component of the app's architecture. Container names are actual instances of that service. Thus, to view service logs, we want to peek into the *container* actually running the service.
 
 It's also important to note that `-f` attaches the logs to your terminal window and will update in real-time. Detach using `CTRL-C`. If `-f` is ommitted, then you will see the logs up to the point of the command being run (and nothing after).
 
@@ -131,12 +131,12 @@ Run the frontend in different environments:
 
 ```sh
 export BUILD_TARGET=development
-docker-compose up --build frontend
+docker compose up -d --build frontend
 ```
 
 ```sh
 export BUILD_TARGET=production
-docker-compose up --build frontend
+docker compose up -d --build frontend
 ```
 
 ### Backend
@@ -144,7 +144,7 @@ docker-compose up --build frontend
 Ensure changes to the backend are reflected by rebuilding it:
 
 ```sh
-docker-compose up --build backend
+docker compose up --build backend
 ```
 
 ### Database
