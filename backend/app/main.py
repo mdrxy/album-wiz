@@ -16,6 +16,7 @@ from PIL import Image
 
 from app import normalize, query
 from app.metadata_orchestrator import MetadataOrchestrator
+from app.import_albums import import_albums
 
 
 # Configure logging
@@ -61,6 +62,40 @@ async def read_root():
     Default route to test if the API is running.
     """
     return {"message": "Hello, World!"}
+
+
+@router.post("/albums")
+async def upload_csv(file: UploadFile = File(...)):
+    """
+    Endpoint to upload a CSV file and import album data into the database.
+
+    Args:
+    - file (UploadFile): CSV file containing album data.
+
+    Returns:
+    - A success message if the import completes.
+    """
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are supported.")
+
+    try:
+        # Save the file temporarily
+        temp_file_path = f"/tmp/{file.filename}"
+        with open(temp_file_path, "wb") as temp_file:
+            contents = await file.read()
+            temp_file.write(contents)
+
+        # Invoke the import_albums function
+        await import_albums(app, temp_file_path)
+
+        # Delete the temporary file after use
+        os.remove(temp_file_path)
+
+        return {"message": "Albums imported successfully."}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to import albums: {str(e)}"
+        ) from e
 
 
 @router.get("/db/{table_name}")
