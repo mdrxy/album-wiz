@@ -1,38 +1,40 @@
 {
-    "name": "vinyl-frontend",
-    "version": "1.0.0",
-    "private": true,
-    "description": "Frontend for the Vinyl Record Recognition System",
-    "scripts": {
-        "start": "react-scripts start",
-        "build": "react-scripts build",
-        "test": "react-scripts test",
-        "eject": "react-scripts eject",
-        "lint": "eslint src"
-    },
-    "dependencies": {
-        "axios": "^1.4.0",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
-        "react-router-dom": "^6.14.0",
-        "react-scripts": "5.0.1",
-        "bootstrap-icons": "1.11.3"
-    },
-    "devDependencies": {
-        "eslint": "^8.50.0",
-        "eslint-plugin-react": "^7.33.0",
-        "eslint-plugin-react-hooks": "^4.6.0"
-    },
-    "browserslist": {
-        "production": [
-            ">0.2%",
-            "not dead",
-            "not op_mini all"
-        ],
-        "development": [
-            "last 1 chrome version",
-            "last 1 firefox version",
-            "last 1 safari version"
-        ]
-    }
+  "name": "vinyl-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Frontend for the Vinyl Record Recognition System",
+  "proxy": "http://vinyl-nginx",
+  "homepage": "/",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.14.0",
+    "react-scripts": "5.0.1",
+    "bootstrap-icons": "1.11.3"
+  },
+  "devDependencies": {
+    "eslint": "^8.50.0",
+    "eslint-plugin-react": "^7.33.0",
+    "eslint-plugin-react-hooks": "^4.6.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
 }

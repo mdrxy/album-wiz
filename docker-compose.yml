@@ -10,7 +10,9 @@ services:
     environment:
       # Variables that can be accessed in the frontend application
       - REACT_APP_API_BASE_URL # `/api`
+      - CHOKIDAR_INTERVAL=100
       - CHOKIDAR_USEPOLLING # File change detection for reload
+      - WDS_SOCKET_PORT=0 # Use the default Webpack Dev Server socket port (needed for hot reloading)
     env_file:
       - .env # `environment` pulls from this file in the root directory of this folder
     depends_on:
