@@ -3,7 +3,8 @@ import axios from "axios";
 
 // Set a default base URL for all axios requests.
 // This means all requests will be made relative to this base URL.
-axios.defaults.baseURL = "http://localhost:8000";
+axios.defaults.baseURL = process.env.REACT_APP_API_BASE_URL;
+
 
 // A mapping from internal field keys to more user-friendly display names.
 const fieldDisplayNames = {
@@ -73,7 +74,7 @@ const MetadataManager = () => {
   useEffect(() => {
     const fetchSources = async () => {
       try {
-        const response = await axios.get("/api/meta-sources");
+        const response = await axios.get("/meta-sources");
         if (response.data && response.data.sources) {
           setAvailableSources(response.data.sources);
         } else {
@@ -114,7 +115,7 @@ const MetadataManager = () => {
       };
 
       // Make the API request to fetch metadata.
-      const response = await axios.get(`/api/metadata/${query}`, {
+      const response = await axios.get(`/metadata/${query}`, {
         params,
         timeout: 10000, // timeout after 10 seconds
       });
@@ -512,7 +513,7 @@ const MetadataManager = () => {
 
   return (
     <div>
-      <h1 className="mb-4 text-center">Data Ingestion</h1>
+      <h1 className="mb-4 text-center">Data Ingestion!</h1>
       <form
         onSubmit={(e) => {
           e.preventDefault();
