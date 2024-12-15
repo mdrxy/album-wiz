@@ -14,9 +14,11 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
 
-from app import normalize, query
+from app import normalize
 from app.metadata_orchestrator import MetadataOrchestrator
 from app.import_albums import import_albums
+from app.process.utils import validate_image, get_image
+from app.process.logic import extract_album_cover, vectorize_image, match_vector
 
 
 # Configure logging
@@ -80,19 +82,24 @@ async def upload_image(image: UploadFile = File(...)):
             status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
         )
 
-    # # Step 1: Validate the uploaded image
-    # await validate_image(image)
+    # Step 1: Validate the uploaded image
+    if not await validate_image(image):
+        raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    # # Step 2: Extract the album cover from the image
-    # album_cover = await extract_album_cover(image)
+    # Step 2: Extract the album cover from the image
+    album_cover = await extract_album_cover(image)
+    if not album_cover:
+        raise HTTPException(status_code=400, detail="No album cover found in the image")
 
-    # # Step 3: Vectorize the extracted album cover
-    # image_vector = await vectorize_image(album_cover)
+    # Step 3: Vectorize the extracted album cover
+    image_vector = await vectorize_image(album_cover)
+    if not image_vector:
+        raise HTTPException(status_code=500, detail="Failed to vectorize the image")
 
-    # # Step 4: Query the database for the most similar album
-    # matched_album = await find_similar_album(image_vector)
+    # Step 4: Query the database for the most similar records
+    matched_records = await match_vector(image_vector)
 
-    # # Step 5: Return the album metadata
+    # Step 5: Return the album metadata
     # return matched_album
 
     return {
@@ -159,6 +166,29 @@ async def upload_csv(file: UploadFile = File(...)):
         ) from e
 
 
+@router.get("/vectorize")
+async def vectorize_albums():
+    """
+    Endpoint to vectorize all album covers in the database.
+    """
+    try:
+        async with app.state.pool.acquire() as connection:
+            sql_query = "SELECT * FROM albums WHERE vector IS NULL;"
+            rows = await connection.fetch(sql_query)
+            for row in rows:
+                album_id = row["id"]
+                image_path = row["cover_image"]
+
+                image = get_image(image_path)
+                image_vector = await vectorize_image(image)
+                if image_vector:
+                    sql_query = "UPDATE albums SET vector = $1 WHERE id = $2;"
+                    await connection.execute(sql_query, image_vector, album_id)
+            return {"message": "Albums vectorized successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/db/{table_name}")
 async def get_table_data(table_name: str):
     """
@@ -182,18 +212,20 @@ async def upload_resolution(data: dict):
     """
     Accept resolved metadata and store it in the database.
     """
-    try:
-        async with app.state.pool.acquire() as connection:
-            sql_query = """
-                INSERT INTO resolved_metadata (search_query, resolution)
-                VALUES ($1, $2)
-                ON CONFLICT (search_query) DO UPDATE
-                SET resolution = EXCLUDED.resolution
-            """
-            await connection.execute(sql_query, data["query"], data["resolution"])
-        return {"message": "Resolution uploaded successfully."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    # TODO
+
+    # try:
+    #     async with app.state.pool.acquire() as connection:
+    #         sql_query = """
+    #             INSERT INTO resolved_metadata (search_query, resolution)
+    #             VALUES ($1, $2)
+    #             ON CONFLICT (search_query) DO UPDATE
+    #             SET resolution = EXCLUDED.resolution
+    #         """
+    #         await connection.execute(sql_query, data["query"], data["resolution"])
+    #     return {"message": "Resolution uploaded successfully."}
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 def hashify(value):
@@ -395,12 +427,12 @@ async def vectorize(file: UploadFile = File(...)):
         square_image = normalize.crop_to_square(image)
         logger.debug("Image cropped to square successfully.")
 
-        vector = query.vectorize(square_image)
+        vector = vectorize(square_image)
         logger.debug("Image vectorized successfully.")
 
         logger.debug("Vector: %s", vector)
 
-        return {"message": "Image successfully converted", "vector": vector.tolist()}
+        return {"message": "Image successfully converted", "vector": vector}
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

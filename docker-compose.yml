@@ -7,12 +7,14 @@ services:
       - ./frontend:/app # Mounts the entire local frontend directory as `/app` in the container
       - /app/node_modules # Prevents the node_modules directory from being overridden by the container
         # (avoid conflicts between the dependencies installed on the host machine and those installed inside the container)
+      - ./database/sample_data/images:/media # Shared volume for album art and other media files
     environment:
       # Variables that can be accessed in the frontend application
       - REACT_APP_API_BASE_URL # `/api`
       - CHOKIDAR_INTERVAL=100
       - CHOKIDAR_USEPOLLING # File change detection for reload
       - WDS_SOCKET_PORT=0 # Use the default Webpack Dev Server socket port (needed for hot reloading)
+      - MEDIA_DIR
     env_file:
       - .env # `environment` pulls from this file in the root directory of this folder
     depends_on:
@@ -28,10 +30,11 @@ services:
     container_name: vinyl-backend
     volumes:
       - ./backend:/app
-      - media:/media # Shared volume for album art and other media files
+      - ./database/sample_data/images:/media
     environment:
       - DATABASE_URL
       - REDIS_URL
+      - MEDIA_DIR
     env_file:
       - .env
     depends_on:
@@ -57,6 +60,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data (allows data to outlive container restarts/builds)
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with our custom SQL init script
+      - ./database/sample_data/images:/media
+      - MEDIA_DIR
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -129,7 +134,6 @@ services:
 volumes:
   postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
   redis_data: # Persistent volume for the Redis cache
-  media: # Shared volume for storing album art
 
 networks:
   vinyl-network:
