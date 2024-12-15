@@ -146,7 +146,7 @@ async def get_album(vector: List[float] = Query(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-@router.post("vectorize")
+@router.post("/vectorize")
 async def vectorize(file: UploadFile = File(...)):
     """
     endpoint that receives an image file and returns the vector representation 
