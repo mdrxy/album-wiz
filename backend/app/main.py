@@ -13,6 +13,7 @@ from typing import AsyncGenerator, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
+from fastapi.staticfiles import StaticFiles
 
 from app import normalize
 from app.metadata_orchestrator import MetadataOrchestrator
@@ -56,6 +57,8 @@ app = FastAPI(lifespan=lifespan)
 
 router = APIRouter()
 orchestrator = MetadataOrchestrator()
+
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
 @router.get("/")
@@ -211,17 +214,37 @@ async def upload_album(data: dict):
 async def delete_album(album_id: int):
     """
     Endpoint to delete an album record from the database.
-
-    Args:
-    - album_id (int): ID of the album record to delete.
-
-    Returns:
-    - A success message if the record is deleted successfully.
+    If the album is the only one by the artist, the artist will be deleted as well.
     """
     async with app.state.pool.acquire() as connection:
         try:
-            await connection.execute("DELETE FROM albums WHERE id = $1;", album_id)
-            return {"message": "Album deleted successfully."}
+            # Start a transaction
+            async with connection.transaction():
+                # Get the artist ID of the album
+                artist_id = await connection.fetchval(
+                    "SELECT artist_id FROM albums WHERE id = $1;", album_id
+                )
+                if not artist_id:
+                    raise HTTPException(status_code=404, detail="Album not found.")
+
+                # Delete the album
+                await connection.execute("DELETE FROM albums WHERE id = $1;", album_id)
+
+                # Check if the artist has any other albums
+                remaining_albums = await connection.fetchval(
+                    "SELECT COUNT(*) FROM albums WHERE artist_id = $1;", artist_id
+                )
+
+                # If no albums remain, delete the artist
+                if remaining_albums == 0:
+                    await connection.execute(
+                        "DELETE FROM artists WHERE id = $1;", artist_id
+                    )
+
+            return {
+                "message": "Album (and artist, if applicable) deleted successfully."
+            }
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
