@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
 from fastapi.staticfiles import StaticFiles
+import torch
 
 from app import normalize
 from app.metadata_orchestrator import MetadataOrchestrator
@@ -28,6 +29,19 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.info("Initializing backend")
+
+EMBEDDING_SIZE = 256
+model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
+num_features = model.fc.in_features
+model.fc = torch.nn.Linear(num_features, EMBEDDING_SIZE)
+model.load_state_dict(torch.load('tuned.pth'))
+model.eval()
+
+img_transform = torch.nn.Sequential(
+    torch.nn.functional.to_tensor(),
+    torch.nn.functional.resize((224, 224)),
+    torch.nn.functional.normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+)
 
 
 # Config database connection
@@ -562,8 +576,8 @@ async def vectorize(file: UploadFile = File(...)):
 
         square_image = normalize.crop_to_square(image)
         logger.debug("Image cropped to square successfully.")
-
-        vector = vectorize(square_image)
+        tensor_image = img_transform(square_image)
+        vector = model(tensor_image).detach().numpy()
         logger.debug("Image vectorized successfully.")
 
         logger.debug("Vector: %s", vector)
@@ -574,26 +588,43 @@ async def vectorize(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
+@router.get("/album")
+async def get_album(vector: List[float] = Query(...)):
+    """
+    Endpoint to receive a vector and return the most similar album.
+    """
+    logger.debug("Received vector: %s", vector)
+    # Check if the vector is valid
+    logger.warning("Vector length: %s, this API is not useable yet.", len(vector))
+    if len(vector) != EMBEDDING_SIZE:
+        raise HTTPException(status_code=400, detail=f"Invalid vector length, expected {EMBEDDING_SIZE}")
+    try:
+        #TODO: Implement the query.get_album function
+        album = query.get_album(vector)
+        return {"message": "Album found", "album": album}
+    except HTTPException as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
-# @router.get("/album")
-# async def get_album(vector: List[float] = Query(...)):
-#     """
-#     Endpoint to receive a vector and return the most similar album.
-#     """
-#     logger.debug("Received vector: %s", vector)
-#     # Check if the vector is valid
-#     logger.warning("Vector length: %s, this API is not useable yet.", len(vector))
-#     if False and len(vector) != 2048:
-#         raise HTTPException(status_code=400, detail="Invalid vector length")
-
-#     try:
-#         # TODO: Implement the query.get_album function
-#         album = query.get_album(vector)
-#         return {"message": "Album found", "album": album}
-#     except HTTPException as e:
-#         raise HTTPException(status_code=400, detail=str(e)) from e
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e)) from e
-
+@router.post("/vectorize")
+async def vectorize(file: UploadFile = File(...)):
+    """
+    endpoint that receives an image file and returns the vector representation 
+    of the image. 
+    
+    Ensure that the image is a square image before passing it to the model.
+    """
+    try: 
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+        square_image = normalize.crop_to_square(image)
+        tensor_image = img_transform(square_image)
+        vector = model(tensor_image).detach().numpy()
+        return {"message": "Image successfully converted", "vector": vector.tolist()}
+    except HTTPException as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 app.include_router(router, prefix="/api")
