@@ -102,8 +102,10 @@ async def upload_image(image: UploadFile = File(...)):
     # Step 5: Return the album metadata
     # return matched_album
 
-    return {
-        "name": "OK Computer",
+    return 
+{
+        "artist_name": "Radiohead",
+        "album_name": "OK Computer",
         "genres": [
             "Alternative Rock",
             "Art Rock",
@@ -115,8 +117,8 @@ async def upload_image(image: UploadFile = File(...)):
         "release_date": "1997-05",
         "total_tracks": 12,
         "tracks": [
-            {"name": "Airbag", "duration": 295, "explicit": False},
-            {"name": "Paranoid Android", "duration": 386, "explicit": False},
+            {"name": "Airbag", "duration": 295, "explicit": True},
+            {"name": "Paranoid Android", "duration": 386, "explicit": None},
             {"name": "Subterranean Homesick Alien", "duration": 269, "explicit": False},
             {"name": "Exit Music (For a Film)", "duration": 270, "explicit": False},
             {"name": "Let Down", "duration": 295, "explicit": False},
@@ -125,8 +127,8 @@ async def upload_image(image: UploadFile = File(...)):
             {"name": "Electioneering", "duration": 270, "explicit": False},
             {"name": "Climbing Up the Walls", "duration": 297, "explicit": False},
             {"name": "No Surprises", "duration": 228, "explicit": False},
-            {"name": "Lucky", "duration": 303, "explicit": False},
-            {"name": "The Tourist", "duration": 269, "explicit": False},
+            {"name": "Lucky", "duration": 303, "explicit": None},
+            {"name": "The Tourist", "duration": 269, "explicit": True},
         ],
         "url": "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
     }
