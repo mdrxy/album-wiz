@@ -13,6 +13,7 @@ from typing import AsyncGenerator, List, float
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
+import torch # PyTorch
 
 from app import normalize, query
 from app.metadata_orchestrator import MetadataOrchestrator
@@ -24,6 +25,13 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.info("Initializing DiscogsCollector")
+
+EMBEDDING_SIZE = 256
+model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
+num_features = model.fc.in_features
+model.fc = torch.nn.Linear(num_features, EMBEDDING_SIZE)
+model.load_state_dict(torch.load('tuned.pth'))
+model.eval()
 
 
 # Config database connection
@@ -108,7 +116,7 @@ async def vectorize(file: UploadFile = File(...)):
         square_image = normalize.crop_to_square(image)
         logger.debug("Image cropped to square successfully.")
 
-        vector = query.vectorize(square_image)
+        vector = model(square_image).detach().numpy()
         logger.debug("Image vectorized successfully.")
 
         logger.debug("Vector: %s", vector)
@@ -127,9 +135,8 @@ async def get_album(vector: List[float] = Query(...)):
     logger.debug("Received vector: %s", vector)
     # Check if the vector is valid
     logger.warning("Vector length: %s, this API is not useable yet.", len(vector))
-    if False and len(vector) != 2048:
-        raise HTTPException(status_code=400, detail="Invalid vector length")
-    
+    if len(vector) != EMBEDDING_SIZE:
+        raise HTTPException(status_code=400, detail=f"Invalid vector length, expected {EMBEDDING_SIZE}")
     try:
         #TODO: Implement the query.get_album function
         album = query.get_album(vector)
@@ -139,5 +146,23 @@ async def get_album(vector: List[float] = Query(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
+@router.post("vectorize")
+async def vectorize(file: UploadFile = File(...)):
+    """
+    endpoint that receives an image file and returns the vector representation 
+    of the image. 
+    
+    Ensure that the image is a square image before passing it to the model.
+    """
+    try: 
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+        square_image = normalize.crop_to_square(image)
+        vector = model(square_image).detach().numpy()
+        return {"message": "Image successfully converted", "vector": vector.tolist()}
+    except HTTPException as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 app.include_router(router, prefix="/api")
