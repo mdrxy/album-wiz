@@ -26,11 +26,22 @@ const ImageUploader = () => {
     "07": "July",
     "08": "August",
     "09": "September",
-    "10": "October",
-    "11": "November",
-    "12": "December",
+    10: "October",
+    11: "November",
+    12: "December",
   };
-  
+
+  const matchAtributes = {
+    artist_name: "Artist Name",
+    album_name: "Album Name",
+    genres: "Genres",
+    release_date: "Release Date",
+    total_tracks: "Total Tracks",
+    tracks: "Tracks",
+  };
+
+  const doNotShow = ["artist_url", "album_url", "artist_image", "album_image"];
+
   const formatValue = (key, value) => {
     if (key === "genres" && Array.isArray(value)) {
       return value.join(", ");
@@ -41,7 +52,9 @@ const ImageUploader = () => {
       return `${monthNames[month]} ${year}`;
     }
     if (Array.isArray(value)) {
-      return `[ ${value.map((v) => (typeof v === "object" ? JSON.stringify(v) : v)).join(", ")} ]`;
+      return `[ ${value
+        .map((v) => (typeof v === "object" ? JSON.stringify(v) : v))
+        .join(", ")} ]`;
     }
     if (typeof value === "object" && value !== null) {
       return JSON.stringify(value);
@@ -65,41 +78,41 @@ const ImageUploader = () => {
   };
 
   // Handle image upload using axios
-  //also handle if the upload is not successful to prompt the user to try again
-  
+  // Also handle if the upload is not successful to prompt the user to try again
+
   const handleUpload = async () => {
-  if (!selectedFile) {
-    alert("Please select an image to upload.");
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("image", selectedFile);
-
-  setUploading(true);
-  setUploadSuccess(null);
-  setUploadError(null);
-
-  try {
-    const response = await axios.post("/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    if (response.status === 200 && response.data) {
-      setUploadSuccess("Image uploaded successfully!");
-      setResponseData(response.data);
-      setSelectedFile(null);
-      setPreviewUrl(null);
-    } else {
-      throw new Error("Upload failed.");
+    if (!selectedFile) {
+      alert("Please select an image to upload.");
+      return;
     }
-  } catch (error) {
-    console.error("Upload error:", error);
-    setUploadError(true); // Set the uploadError state to trigger retry dialog
-  } finally {
-    setUploading(false);
-  }
-};
+
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+
+    setUploading(true);
+    setUploadSuccess(null);
+    setUploadError(null);
+
+    try {
+      const response = await axios.post("/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (response.status === 200 && response.data) {
+        setUploadSuccess("Image matched successfully!");
+        setResponseData(response.data);
+        setSelectedFile(null);
+        setPreviewUrl(null);
+      } else {
+        throw new Error("Upload failed.");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      setUploadError(true); // Set the uploadError state to trigger retry dialog
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Cleanup the object URL to avoid memory leaks
   useEffect(() => {
@@ -121,8 +134,8 @@ const ImageUploader = () => {
   return (
     <div className="text-center">
       {/* Hide the header after upload */}
-      {!uploadSuccess && <h2>Upload an Image</h2>}
-      
+      {!uploadSuccess && <h2>Upload Image</h2>}
+
       <div className="mb-3">
         {!uploadSuccess && !selectedFile && (
           <input
@@ -145,17 +158,16 @@ const ImageUploader = () => {
         </div>
       )}
 
-{selectedFile && !uploadError && (
-  <button
-    className="btn btn-primary"
-    onClick={handleUpload}
-    disabled={uploading || !selectedFile}
-    style={buttonStyle}
-  >
-    {uploading ? "Uploading..." : "Confirm"}
-  </button>
-)}
-
+      {selectedFile && !uploadError && (
+        <button
+          className="btn btn-primary"
+          onClick={handleUpload}
+          disabled={uploading || !selectedFile}
+          style={buttonStyle}
+        >
+          {uploading ? "Uploading..." : "Confirm"}
+        </button>
+      )}
 
       {/* Feedback Messages */}
       {uploadSuccess && (
@@ -170,58 +182,57 @@ const ImageUploader = () => {
         </div>
       )}
 
-  
-{uploadSuccess && responseData && (
-  <div className="mt-3">
-    {/* Title Below Spotify Button */}
-    {responseData.name && (
-      <h4
-        style={{
-          margin: "10px 0",
-          color: "#333",
-          fontFamily: "Arial, sans-serif",
-          textAlign: "center",
-          fontSize: "1.5rem",
-        }}
-      >
-        {responseData.name}
-      </h4>
-    )}
+      {uploadSuccess && responseData && (
+        <div className="mt-3">
+          {/* Title Below Spotify Button */}
+          {responseData.name && (
+            <h4
+              style={{
+                margin: "10px 0",
+                color: "#333",
+                fontFamily: "Arial, sans-serif",
+                textAlign: "center",
+                fontSize: "1.5rem",
+              }}
+            >
+              {responseData.name}
+            </h4>
+          )}
 
-    {/* Uploaded Image */}
-    {responseData.image && (
-      <div className="d-flex justify-content-center mt-2">
-        <img
-          src={responseData.image}
-          alt="Uploaded File"
-          style={{ maxWidth: "12.5%", borderRadius: "8px" }}
-        />
-      </div>
-    )}
-  </div>
-)}
+          {/* Uploaded Image */}
+          {responseData.album_image && (
+            <div className="d-flex justify-content-center mt-2">
+              <img
+                src={responseData.album_image}
+                alt="Album image"
+                style={{ maxWidth: "12.5%", borderRadius: "8px" }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
-{responseData && responseData.album_name && responseData.artist_name && (
-  <div className="mt-3">
-    <h4
-      style={{
-        margin: "10px 0",
-        color: "#333",
-        fontFamily: "Arial, sans-serif",
-        textAlign: "center",
-        fontSize: "1.5rem",
-      }}
-    >
-      {responseData.artist_name} - {responseData.album_name}
-    </h4>
-  </div>
-)}
+      {responseData && responseData.album_name && responseData.artist_name && (
+        <div className="mt-3">
+          <h4
+            style={{
+              margin: "10px 0",
+              color: "#333",
+              fontFamily: "Arial, sans-serif",
+              textAlign: "center",
+              fontSize: "1.5rem",
+            }}
+          >
+            {responseData.artist_name} - {responseData.album_name}
+          </h4>
+        </div>
+      )}
 
       {/* Spotify Button */}
-      {responseData && responseData.url && (
+      {responseData && responseData.album_url && (
         <div className="mt-4 d-flex justify-content-center align-items-center">
           <a
-            href={responseData.url}
+            href={responseData.album_url}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-success d-flex align-items-center"
@@ -252,15 +263,21 @@ const ImageUploader = () => {
         >
           <div>
             {Object.entries(responseData)
-              .filter(([key]) => key !== "image" && key !== "url" && key !== "tracks")
+              .filter(([key]) => !doNotShow.includes(key) && key !== "tracks")
               .map(([key, value]) => (
                 <div key={key} style={{ marginBottom: "10px" }}>
                   <span
-                    style={{ color: "red", fontWeight: "bold", textTransform: "capitalize" }}
+                    style={{
+                      color: "red",
+                      fontWeight: "bold",
+                    }}
                   >
-                    {capitalizeKey(key)}:
+                    {/* Use the keyDisplayMap to display a friendly name, fallback to the original key if not found */}
+                    {matchAtributes[key] || key}:
                   </span>{" "}
-                  <span style={{ color: "#444" }}>{formatValue(key, value)}</span>
+                  <span style={{ color: "#444" }}>
+                    {formatValue(key, value)}
+                  </span>
                 </div>
               ))}
             {/* Show/Hide Tracks Button */}
@@ -268,37 +285,49 @@ const ImageUploader = () => {
               <button
                 className="btn btn-secondary mt-2"
                 onClick={() => setShowTracks((prev) => !prev)}
-                style={{ fontSize: "1rem", marginTop: "10px", padding: "5px 10px" }}
+                style={{
+                  fontSize: "1rem",
+                  marginTop: "10px",
+                  padding: "5px 10px",
+                }}
               >
                 {showTracks ? "Hide Tracks" : "Show Tracks"}
               </button>
             )}
             {showTracks && responseData.tracks && (
-              <ul style={{ marginTop: "10px", paddingLeft: "20px", listStyleType: "circle" }}>
+              <ul
+                style={{
+                  marginTop: "10px",
+                  paddingLeft: "20px",
+                  listStyleType: "circle",
+                }}
+              >
                 {responseData.tracks.map((track, index) => {
-  const minutes = Math.floor(track.duration / 60);
-  const seconds = track.duration % 60;
+                  const minutes = Math.floor(track.duration / 60);
+                  const seconds = track.duration % 60;
 
-  // Dynamically determine the duration color
-  const durationStyle = {
-    color: minutes > 5 ? "red" : minutes < 3 ? "blue" : "inherit",
-  };
+                  // Dynamically determine the duration color
+                  const durationStyle = {
+                    color:
+                      minutes > 5 ? "red" : minutes < 3 ? "blue" : "inherit",
+                  };
 
-  return (
-    <li key={index} style={{ marginBottom: "10px" }}>
-      <span>Name:</span> {track.name} <br />
-      <span style={durationStyle}>
-        Duration: {minutes}m {seconds}s
-      </span>
-      <br />
-      {(track.explicit === true || track.explicit === null) && (
-        <span>
-          Explicit: {track.explicit === true ? "Yes" : "Unknown"} <br />
-        </span>
-      )}
-    </li>
-  );
-})}
+                  return (
+                    <li key={index} style={{ marginBottom: "10px" }}>
+                      <span>Name:</span> {track.name} <br />
+                      <span style={durationStyle}>
+                        Duration: {minutes}m {seconds}s
+                      </span>
+                      <br />
+                      {(track.explicit === true || track.explicit === null) && (
+                        <span>
+                          Explicit:{" "}
+                          {track.explicit === true ? "Yes" : "Unknown"} <br />
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
