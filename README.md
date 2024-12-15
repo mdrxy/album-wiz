@@ -30,7 +30,11 @@ The vector search service is separated into its own service for modularity, scal
 
 ### Prerequisites
 
-- [Install Docker and Docker Compose on your system.](https://docs.docker.com/compose/install/)
+Ensure you install the following locally first:
+
+- [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)
+- [Node.js and npm](https://nodejs.org/en)
+- Python 3.10+
 
 ### Installation
 
@@ -45,9 +49,14 @@ The vector search service is separated into its own service for modularity, scal
 
     ```bash
     cp .sample.env .env
+    nano .env
     ```
 
-    Enter values for `DISCOGS_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
+    Enter values for `DISCOGS_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`.
+
+    - Get a Discogs token by making a Discogs account and then [generating a personal access token](discogs.com/settings/developers).
+
+    - Get Spotify Client ID and secrets by making an app in their [developer dashboard](https://developer.spotify.com/).
 
 3. Build and start the containers:
 
@@ -57,30 +66,70 @@ The vector search service is separated into its own service for modularity, scal
 
     Note: if you omit `-d`, the app will still launch and logs will be output to your terminal. However, upon pressing `CTRL-C`, the containers will stop. The `-d` flag detaches the containers and runs them in the background.
 
+    Omit `--build` if there are no container changes needing to be made (e.g. you only changed `backend` or `frontend` code).
+
 4. Access the services:
    - Frontend: <http://localhost/>
    - Backend: <http://localhost/api/>
    - pgAdmin: <http://localhost/pga/>
+     - User/pass: `admin@vinyl.com`/`admin`
+     - PostgreSQL: `postgres`/`postgres`
 
-5. Stop services
+5. Stop all services:
 
     ```bash
     docker compose down
     ```
 
-## Development / Contributing
+    Note: this command must be ran from the project's top level directory (`/album-wiz`).
+
+## Development
 
 ### Debugging
 
-To debug a specific container, view its logs, e.g.
+To debug a specific container, you can view its logs using:
 
 ```bash
 docker logs -f vinyl-backend
 ```
 
-Note that you need to use the *container* name instead of the *service* name. Service names come from `docker-compose.yml` to refer to a component of the app's architecture. Container names are actual instances of that service. Thus, to view service logs, we want to peek into the *container* actually running the service.
+Note that you need to use the *container* name instead of the *service* name. Service names come from `docker compose.yml` to refer to a component of the app's architecture. *Container names* are actual instances of that service. Thus, to view service logs, we want to peek into the *container* actually running the service.
 
 It's also important to note that `-f` attaches the logs to your terminal window and will update in real-time. Detach using `CTRL-C`. If `-f` is ommitted, then you will see the logs up to the point of the command being run (and nothing after).
+
+### Frontend (React)
+
+1. Navigate to the frontend directory:
+
+    ```sh
+    cd frontend
+    ```
+
+2. Install dependencies:
+
+    ```sh
+    npm install
+    ```
+
+3. Rebuild the frontend in Docker (if needed):
+
+    For instances where you modify the Dockerfile for the frontend or update any configuration in docker-compose.yml that impacts the frontend service (e.g., ports, environment variables, volumes, or build context).
+
+    If you update `package.json` (e.g., add, remove, or update npm packages), Docker needs to re-install dependencies, which requires rebuilding the container.
+
+    ```sh
+    cd frontend
+    npm install
+    docker compose up -d --build frontend
+    ```
+
+### Backend
+
+Changes made in `/backend` are automatically reflected in the running backend service. However, if you need to rebuild the backend service for any reason:
+
+```bash
+docker compose up -d --build backend
+```
 
 ### Executing commands inside a running container
 
@@ -90,41 +139,58 @@ To access a running container, run the following, replacing `vinyl-backend` with
 docker exec -it vinyl-backend /bin/bash
 ```
 
-#### Shortcut: update Nginx
+### Database
 
-To update the Nginx config inside the running container, make the necessary changes locally and then run:
+To modify the database schema:
+
+1. Edit `database/init.sql`
+
+2. Drop the local `postgres_data` Docker volume:
+
+    ```sh
+    docker compose down
+    docker volume rm album-wiz_postgres_data
+    ```
+
+3. Rebuild the database container:
+
+    ```sh
+    docker compose up -d --build database
+    ```
+
+### Update Nginx config without rebuilding
+
+To update the Nginx config, make the necessary changes locally and then run:
 
 ```bash
 docker exec vinyl-nginx nginx -s reload
 ```
 
-### Building a container following changes
-
-If you've made changes to a service, rebuild and restart it:
-
-```bash
-docker compose up --build backend
-```
-
-### Running tests
-
-To run tests,
-TODO
-
-### Frontend
-
-Note: if changing `package.json`, don't forget to run `npm install` from the `frontend/` folder so that `package-lock.json` is updated.
-
-### Backend
-
-### Database
-
-If you need to make changes to the database schema, edit `database/init.sql`.
-
-### Vector Search
-
 ## Troubleshooting
+
+WIP
+
+## Contributing Guidelins
+
+1. Always create feature branches for new work:
+
+    ```sh
+    git checkout -b feature/new-feature-name
+    ```
+
+2. Commit changes with descriptive messages:
+
+    ```sh
+    git commit -m "Fix: Add health check for backend service"
+    ```
+
+3. Submit pull requests for review. Include:
+
+      - A clear summary of changes
+      - Testing instructions
+
+4. Run code formatters (e.g., black for Python, Prettier for JS) before committing.
 
 ## TODO
 
-Use a Makefile?
+- Show artist images on library page

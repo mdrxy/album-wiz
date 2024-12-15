@@ -99,8 +99,6 @@ class SpotifyCollector(MetadataCollector):
                 - "explicit": True if the track is explicit, False otherwise
                     - None if the information is not available
         - "url": URL to the album's page on the source website
-        - "popularity": A popularity score for the album
-            - Should be a number between 0 and 100
         """
         self.logger.info(
             "Fetching Spotify album: '%s' by artist: '%s'", album_name, artist_name
@@ -125,7 +123,7 @@ class SpotifyCollector(MetadataCollector):
         tracks = [
             {
                 "name": track["name"],
-                "duration_seconds": track["duration_ms"] / 1000,
+                "duration": int(track["duration_ms"] / 1000),
                 "explicit": track["explicit"] if "explicit" in track else None,
             }
             for track in tracks_data.get("items", [])
@@ -143,7 +141,6 @@ class SpotifyCollector(MetadataCollector):
                 if "spotify" in album_data["external_urls"]
                 else None
             ),
-            "popularity": None,  # NOTE: Spotify does not provide popularity for albums anymore
         }
 
         # Releast date should be in the format: "YYYY-MM"
@@ -183,7 +180,7 @@ class SpotifyCollector(MetadataCollector):
 
         metadata = {
             "artist": artist_details,
-            "album": album_details,
+            "album": album_details if album_details else None,
         }
         self.logger.debug("Spotify metadata fetched: %s", metadata)
         return metadata
