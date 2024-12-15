@@ -10,9 +10,12 @@ const ImageUploader = () => {
   const [responseData, setResponseData] = useState(null); // New state for response data
   const [showTracks, setShowTracks] = useState(false); // State for toggling tracks
 
-  // Helper function to capitalize keys
-  const capitalizeKey = (key) => {
-    return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+  // Helper function to format duration
+  const formatDuration = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    // return `${minutes}m ${remainingSeconds}s`;
+    return `${minutes} minutes`;
   };
 
   // Format values for better display
@@ -31,16 +34,17 @@ const ImageUploader = () => {
     12: "December",
   };
 
-  const matchAtributes = {
-    artist_name: "Artist Name",
-    album_name: "Album Name",
+  const matchAttributes = {
+    artist_name: "Artist",
+    album_name: "Release",
     genres: "Genres",
-    release_date: "Release Date",
-    total_tracks: "Total Tracks",
+    release_date: "Released",
+    total_tracks: "# Tracks",
+    duration: "Duration",
     tracks: "Tracks",
   };
 
-  const doNotShow = ["artist_url", "album_url", "artist_image", "album_image"];
+  const doNotShow = ["artist_url", "album_url", "artist_image", "album_image", "total_duration"];
 
   const formatValue = (key, value) => {
     if (key === "genres" && Array.isArray(value)) {
@@ -50,6 +54,9 @@ const ImageUploader = () => {
       // Transform 'YYYY-MM' to 'Month YYYY'
       const [year, month] = value.split("-");
       return `${monthNames[month]} ${year}`;
+    }
+    if (key === "total_duration") {
+      return formatDuration(value);
     }
     if (Array.isArray(value)) {
       return `[ ${value
@@ -228,25 +235,6 @@ const ImageUploader = () => {
         </div>
       )}
 
-      {/* Spotify Button */}
-      {responseData && responseData.album_url && (
-        <div className="mt-4 d-flex justify-content-center align-items-center">
-          <a
-            href={responseData.album_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-success d-flex align-items-center"
-            style={buttonStyle}
-          >
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg"
-              alt="Spotify"
-              style={{ width: "24px", height: "24px", marginRight: "10px" }}
-            />
-            Open in Spotify
-          </a>
-        </div>
-      )}
 
       {/* Print the Server Response */}
       {responseData && (
@@ -273,13 +261,22 @@ const ImageUploader = () => {
                     }}
                   >
                     {/* Use the keyDisplayMap to display a friendly name, fallback to the original key if not found */}
-                    {matchAtributes[key] || key}:
+                    {matchAttributes[key] || key}:
                   </span>{" "}
                   <span style={{ color: "#444" }}>
                     {formatValue(key, value)}
                   </span>
                 </div>
               ))}
+            {/* Total Duration */}
+            {responseData.total_duration && (
+              <div style={{ marginBottom: "10px" }}>
+                <span style={{ color: "red", fontWeight: "bold" }}>{matchAttributes["duration"]}:</span>{" "}
+                <span style={{ color: "#444" }}>
+                  {formatDuration(responseData.total_duration)}
+                </span>
+              </div>
+            )}
             {/* Show/Hide Tracks Button */}
             {responseData.tracks && (
               <button
@@ -287,7 +284,6 @@ const ImageUploader = () => {
                 onClick={() => setShowTracks((prev) => !prev)}
                 style={{
                   fontSize: "1rem",
-                  marginTop: "10px",
                   padding: "5px 10px",
                 }}
               >
@@ -298,8 +294,8 @@ const ImageUploader = () => {
               <ul
                 style={{
                   marginTop: "10px",
-                  paddingLeft: "20px",
-                  listStyleType: "circle",
+                  paddingLeft: "40px",
+                  listStyleType: "decimal-leading-zero",
                 }}
               >
                 {responseData.tracks.map((track, index) => {
@@ -314,15 +310,15 @@ const ImageUploader = () => {
 
                   return (
                     <li key={index} style={{ marginBottom: "10px" }}>
-                      <span>Name:</span> {track.name} <br />
+                      <b>{track.name}</b> <br />
                       <span style={durationStyle}>
-                        Duration: {minutes}m {seconds}s
+                        {minutes}m {seconds}s
                       </span>
                       <br />
                       {(track.explicit === true || track.explicit === null) && (
-                        <span>
-                          Explicit:{" "}
-                          {track.explicit === true ? "Yes" : "Unknown"} <br />
+                        <span style={{ color: "red" }}>
+                          Explicit
+                          {track.explicit === true ? "" : ": Unknown"} <br />
                         </span>
                       )}
                     </li>
@@ -331,6 +327,26 @@ const ImageUploader = () => {
               </ul>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Spotify Button */}
+      {responseData && responseData.album_url && (
+        <div className="mt-4 d-flex justify-content-center align-items-center">
+          <a
+            href={responseData.album_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-outline-secondary d-flex align-items-center"
+            style={buttonStyle}
+          >
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg"
+              alt="Spotify"
+              style={{ width: "24px", height: "24px", marginRight: "10px" }}
+            />
+            Open in Spotify
+          </a>
         </div>
       )}
     </div>

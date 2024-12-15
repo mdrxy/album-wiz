@@ -1,9 +1,11 @@
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
-import { Navbar, Nav, Container } from 'react-bootstrap';
+import { Navbar, Nav, Container } from "react-bootstrap";
 import MetadataManager from "./components/MetadataManager";
-import ImageUploader from "./components/ImageUploader"; 
+import ImageUploader from "./components/ImageUploader";
 import Library from "./components/Library";
+import NotFound from "./components/NotFound";
+import ServerError from "./components/ServerError";
 
 const App = () => {
   return (
@@ -34,6 +36,8 @@ const App = () => {
           <Route path="/" element={<ImageUploader />} />
           <Route path="/metadata" element={<MetadataManager />} />
           <Route path="/library" element={<Library />} />
+          <Route path="/500" element={<ServerError />} />
+          <Route path="*" element={<NotFound />} /> {/* Catch-all route */}
         </Routes>
       </Container>
     </div>

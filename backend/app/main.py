@@ -119,6 +119,7 @@ async def upload_image(image: UploadFile = File(...)):
         "album_image": "https://static.independent.co.uk/s3fs-public/thumbnails/image/2017/05/10/11/ok-computer.png",
         "release_date": "1997-05",
         "total_tracks": 12,
+        "total_duration": 3230,
         "tracks": [
             {"name": "Airbag", "duration": 295, "explicit": True},
             {"name": "Paranoid Android", "duration": 386, "explicit": None},
