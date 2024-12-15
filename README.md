@@ -190,3 +190,7 @@ WIP
       - Testing instructions
 
 4. Run code formatters (e.g., black for Python, Prettier for JS) before committing.
+
+## TODO
+
+- Show artist images on library page
