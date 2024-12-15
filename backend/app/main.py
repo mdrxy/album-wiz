@@ -64,6 +64,67 @@ async def read_root():
     return {"message": "Hello, World!"}
 
 
+@router.post("/upload")
+async def upload_image(image: UploadFile = File(...)):
+    """
+    Endpoint to receive an image file from the homepage.
+
+    Args:
+    - file (UploadFile): The image file to save.
+
+    Returns:
+    - JSON with the matched album or an error message.
+    """
+    if not image.filename.endswith((".jpg", ".jpeg", ".png")):
+        raise HTTPException(
+            status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
+        )
+
+    # # Step 1: Validate the uploaded image
+    # await validate_image(image)
+
+    # # Step 2: Extract the album cover from the image
+    # album_cover = await extract_album_cover(image)
+
+    # # Step 3: Vectorize the extracted album cover
+    # image_vector = await vectorize_image(album_cover)
+
+    # # Step 4: Query the database for the most similar album
+    # matched_album = await find_similar_album(image_vector)
+
+    # # Step 5: Return the album metadata
+    # return matched_album
+
+    return {
+        "name": "OK Computer",
+        "genres": [
+            "Alternative Rock",
+            "Art Rock",
+            "Progressive Rock",
+            "Electronic",
+            "Experimental",
+        ],
+        "image": "https://i.scdn.co/image/ab6761610000e5eba03696716c9ee605006047fd",
+        "release_date": "1997-05",
+        "total_tracks": 12,
+        "tracks": [
+            {"name": "Airbag", "duration": 295, "explicit": False},
+            {"name": "Paranoid Android", "duration": 386, "explicit": False},
+            {"name": "Subterranean Homesick Alien", "duration": 269, "explicit": False},
+            {"name": "Exit Music (For a Film)", "duration": 270, "explicit": False},
+            {"name": "Let Down", "duration": 295, "explicit": False},
+            {"name": "Karma Police", "duration": 258, "explicit": False},
+            {"name": "Fitter Happier", "duration": 90, "explicit": False},
+            {"name": "Electioneering", "duration": 270, "explicit": False},
+            {"name": "Climbing Up the Walls", "duration": 297, "explicit": False},
+            {"name": "No Surprises", "duration": 228, "explicit": False},
+            {"name": "Lucky", "duration": 303, "explicit": False},
+            {"name": "The Tourist", "duration": 269, "explicit": False},
+        ],
+        "url": "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
+    }
+
+
 @router.post("/albums")
 async def upload_csv(file: UploadFile = File(...)):
     """

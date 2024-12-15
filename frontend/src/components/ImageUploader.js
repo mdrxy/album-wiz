@@ -48,6 +48,7 @@ const ImageUploader = () => {
         setUploadSuccess("Image uploaded successfully!");
         setSelectedFile(null);
         setPreviewUrl(null);
+        console.log("Upload success:", response.data);
       } else {
         throw new Error(response.statusText || "Upload failed.");
       }
