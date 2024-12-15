@@ -2,6 +2,7 @@
 Module with common functions to validate image files sent by the user.
 """
 
+from io import BytesIO
 import os
 from dotenv import load_dotenv
 from fastapi import HTTPException, UploadFile
@@ -35,9 +36,9 @@ async def validate_image(image: UploadFile):
     # Additional validations can be added here (e.g., file size, image integrity, etc.)
 
 
-async def get_image(path: str):
+async def get_image(path: str) -> UploadFile:
     """
-    Returns the image file from the specified path in the MEDIA_DIR.
+    Returns the image file from the specified path in the MEDIA_DIR as an UploadFile object.
 
     Args:
     - path (str): The path to the image file.
@@ -48,4 +49,13 @@ async def get_image(path: str):
     # Match the provided path to the image in MEDIA_DIR
     image_path = os.path.join(MEDIA_DIR, path)
     with open(image_path, "rb") as image_file:
-        return image_file.read()
+        # Read the file contents into memory
+        contents = image_file.read()
+        # Wrap the contents in a BytesIO object and return as UploadFile
+        # Done to simulate an UploadFile object
+        # Which is needed for the validate_image function
+        # TODO: refactor validate_image?
+        return UploadFile(
+            filename=os.path.basename(image_path),
+            file=BytesIO(contents),
+        )

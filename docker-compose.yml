@@ -31,6 +31,7 @@ services:
     volumes:
       - ./backend:/app
       - ./database/sample_data/images:/media
+      - ./database/sample_data/import.csv:/app/import.csv
     environment:
       - DATABASE_URL
       - REDIS_URL
@@ -61,7 +62,6 @@ services:
       - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data (allows data to outlive container restarts/builds)
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with our custom SQL init script
       - ./database/sample_data/images:/media
-      - MEDIA_DIR
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -103,8 +103,6 @@ services:
     build:
       context: ./vector-search
     container_name: vinyl-vector-search
-    volumes:
-      - media:/media # Shared volume for accessing media files during vector processing
     environment:
       - DATABASE_URL
     env_file:

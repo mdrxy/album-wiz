@@ -171,21 +171,39 @@ async def vectorize_albums():
     """
     Endpoint to vectorize all album covers in the database.
     """
+    logger.debug("Starting vectorization of album covers.")
     try:
         async with app.state.pool.acquire() as connection:
-            sql_query = "SELECT * FROM albums WHERE vector IS NULL;"
+            sql_query = "SELECT * FROM albums WHERE embedding IS NULL;"
             rows = await connection.fetch(sql_query)
+            logger.debug("Fetched %d albums to vectorize.", len(rows))
             for row in rows:
                 album_id = row["id"]
                 image_path = row["cover_image"]
+                logger.debug(
+                    "Processing album ID %d with image path %s.", album_id, image_path
+                )
 
-                image = get_image(image_path)
+                image = await get_image(image_path)
+                logger.debug("Image retrieved successfully for album ID %d.", album_id)
                 image_vector = await vectorize_image(image)
                 if image_vector:
-                    sql_query = "UPDATE albums SET vector = $1 WHERE id = $2;"
+                    logger.debug(
+                        "Vectorized image successfully for album ID. Size: %s, ID: %d.",
+                        len(image_vector),
+                        album_id,
+                    )
+
+                    # TODO: get the encoding and use here
+
+                    sql_query = "UPDATE albums SET embedding = $1 WHERE id = $2;"
                     await connection.execute(sql_query, image_vector, album_id)
+                    logger.debug(
+                        "Vector updated successfully for album ID %d.", album_id
+                    )
             return {"message": "Albums vectorized successfully."}
     except Exception as e:
+        logger.error("Error during vectorization: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -416,7 +434,7 @@ async def vectorize(file: UploadFile = File(...)):
     """
     Endpoint to receive an image file and convert it to a PIL image.
     """
-    logger.debug("Received file: %s", file.filename)
+    logger.debug("Received file: %s", file)
     try:
         contents = await file.read()
         logger.debug("File contents read successfully.")
