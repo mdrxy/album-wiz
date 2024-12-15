@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file to the working directory
@@ -20,6 +21,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the backend code to the working directory
 COPY . .
 
+# Copy the import.csv file into the container
+COPY import.csv /app/import.csv
+
+# Copy the startup script
+COPY startup.sh /app/startup.sh
+RUN chmod +x /app/startup.sh
+
 # Set the PYTHONPATH environment variable
 ENV PYTHONPATH "${PYTHONPATH}:/app/"
 
@@ -27,4 +35,4 @@ ENV PYTHONPATH "${PYTHONPATH}:/app/"
 EXPOSE 8000
 
 # Set the command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["/app/startup.sh"]
