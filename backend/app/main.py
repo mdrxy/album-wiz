@@ -95,7 +95,8 @@ async def upload_image(image: UploadFile = File(...)):
     # # Step 5: Return the album metadata
     # return matched_album
 
-    return {
+    return 
+{
         "artist_name": "Radiohead",
         "album_name": "OK Computer",
         "genres": [

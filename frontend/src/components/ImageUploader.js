@@ -65,47 +65,41 @@ const ImageUploader = () => {
   };
 
   // Handle image upload using axios
+  //also handle if the upload is not successful to prompt the user to try again
+  
   const handleUpload = async () => {
-    if (!selectedFile) {
-      alert("Please select an image to upload.");
-      return;
+  if (!selectedFile) {
+    alert("Please select an image to upload.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("image", selectedFile);
+
+  setUploading(true);
+  setUploadSuccess(null);
+  setUploadError(null);
+
+  try {
+    const response = await axios.post("/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    if (response.status === 200 && response.data) {
+      setUploadSuccess("Image uploaded successfully!");
+      setResponseData(response.data);
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    } else {
+      throw new Error("Upload failed.");
     }
-
-    const formData = new FormData();
-    formData.append("image", selectedFile);
-
-    setUploading(true);
-    setUploadSuccess(null);
-    setUploadError(null);
-
-    try {
-      const response = await axios.post("/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      if (response.status === 200) {
-        setUploadSuccess("Image uploaded successfully!");
-        setResponseData(response.data); // Save the response data
-        setSelectedFile(null);
-        setPreviewUrl(null);
-
-        console.log("Upload success:", response.data);
-      } else {
-        throw new Error(response.statusText || "Upload failed.");
-      }
-    } catch (error) {
-      console.error("Upload error:", error);
-      if (error.response) {
-        setUploadError(`Upload failed: ${error.response.data.message || error.message}`);
-      } else if (error.request) {
-        setUploadError("No response from the server. Please try again later.");
-      } else {
-        setUploadError(`Upload failed: ${error.message}`);
-      }
-    } finally {
-      setUploading(false);
-    }
-  };
+  } catch (error) {
+    console.error("Upload error:", error);
+    setUploadError(true); // Set the uploadError state to trigger retry dialog
+  } finally {
+    setUploading(false);
+  }
+};
 
   // Cleanup the object URL to avoid memory leaks
   useEffect(() => {
@@ -151,16 +145,17 @@ const ImageUploader = () => {
         </div>
       )}
 
-{selectedFile && (
+{selectedFile && !uploadError && (
   <button
     className="btn btn-primary"
     onClick={handleUpload}
     disabled={uploading || !selectedFile}
     style={buttonStyle}
   >
-    {uploading ? "Uploading..." : uploadSuccess ? "Confirm" : "Confirm"}
+    {uploading ? "Uploading..." : "Confirm"}
   </button>
 )}
+
 
       {/* Feedback Messages */}
       {uploadSuccess && (
@@ -170,12 +165,12 @@ const ImageUploader = () => {
       )}
       {uploadError && (
         <div className="alert alert-danger mt-3" role="alert">
+          Fail to upload image. Please REFRESH to try again.
           {uploadError}
         </div>
       )}
 
-      {/* Display Uploaded Image Below Success Message */}
-      {/* Display Uploaded Image, Title, and Spotify Button */}
+  
 {uploadSuccess && responseData && (
   <div className="mt-3">
     {/* Title Below Spotify Button */}
