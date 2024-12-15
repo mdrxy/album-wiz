@@ -33,6 +33,12 @@ model.fc = torch.nn.Linear(num_features, EMBEDDING_SIZE)
 model.load_state_dict(torch.load('tuned.pth'))
 model.eval()
 
+img_transform = torch.nn.Sequential(
+    torch.nn.functional.to_tensor(),
+    torch.nn.functional.resize((224, 224)),
+    torch.nn.functional.normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+)
+
 
 # Config database connection
 
@@ -115,8 +121,8 @@ async def vectorize(file: UploadFile = File(...)):
 
         square_image = normalize.crop_to_square(image)
         logger.debug("Image cropped to square successfully.")
-
-        vector = model(square_image).detach().numpy()
+        tensor_image = img_transform(square_image)
+        vector = model(tensor_image).detach().numpy()
         logger.debug("Image vectorized successfully.")
 
         logger.debug("Vector: %s", vector)
@@ -158,7 +164,8 @@ async def vectorize(file: UploadFile = File(...)):
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
         square_image = normalize.crop_to_square(image)
-        vector = model(square_image).detach().numpy()
+        tensor_image = img_transform(square_image)
+        vector = model(tensor_image).detach().numpy()
         return {"message": "Image successfully converted", "vector": vector.tolist()}
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
