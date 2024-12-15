@@ -1,10 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
-import axios from "axios";
-
-// Set a default base URL for all axios requests.
-// This means all requests will be made relative to this base URL.
-axios.defaults.baseURL = process.env.REACT_APP_API_BASE_URL;
-
+import axios from "../axiosConfig"; // Import the configured axios instance
+import {
+  Form,
+  Button,
+  Table,
+  Spinner,
+  Alert,
+  Container,
+  Row,
+  Col,
+  Badge,
+  ProgressBar,
+} from "react-bootstrap";
 
 // A mapping from internal field keys to more user-friendly display names.
 const fieldDisplayNames = {
@@ -54,12 +61,14 @@ const MetadataManager = () => {
   // This function checks if a given URL looks like an image URL
   const isImageUrl = (url) => {
     if (typeof url !== "string") return false;
-    return url.toLowerCase().includes("image") || /\.(jpeg|jpg|png|gif|webp)$/i.test(url);
+    return (
+      url.toLowerCase().includes("image") ||
+      /\.(jpeg|jpg|png|gif|webp)$/i.test(url)
+    );
   };
 
   // useEffect hooks allow you to run side-effects when state or props change.
   // This one runs whenever 'error' changes. If there's an error, scroll to it.
-  // TODO: fix this
   useEffect(() => {
     if (error && errorRef.current) {
       errorRef.current.scrollIntoView({
@@ -250,6 +259,7 @@ const MetadataManager = () => {
     }
 
     // TODO: upload finalResolution to backend
+    console.log("Final Resolution to Upload:", finalResolution);
   };
 
   // If there's only one source, after reviewing, the user can confirm.
@@ -270,7 +280,7 @@ const MetadataManager = () => {
   };
 
   // Format multiple sources in a user-friendly way
-  // e.g., "musicbrainz and discogs" or "musicbrainz, discogs, and spotify"
+  // e.g., "MusicBrainz and Discogs" or "MusicBrainz, Discogs, and Spotify"
   const formatSources = (sources) => {
     const capitalized = sources.map(formatSourceName);
     if (capitalized.length === 1) return capitalized[0];
@@ -297,7 +307,7 @@ const MetadataManager = () => {
     if (label.toLowerCase().includes("image") && typeof value === "string") {
       const imageUrl = value;
       return (
-        <div className="mb-3">
+        <div className="mb-3" key={label}>
           <h3>{label}</h3>
           {imageUrl ? (
             <img
@@ -316,7 +326,7 @@ const MetadataManager = () => {
     // Handle URLs
     if (label.toLowerCase().includes("url") && typeof value === "string") {
       return (
-        <div className="mb-3">
+        <div className="mb-3" key={label}>
           <h3>{label}</h3>
           {value ? (
             <a href={value} target="_blank" rel="noopener noreferrer">
@@ -335,20 +345,9 @@ const MetadataManager = () => {
       typeof value === "number"
     ) {
       return (
-        <div className="mb-3">
+        <div className="mb-3" key={label}>
           <h3>{label}</h3>
-          <div className="progress" style={{ maxWidth: "200px" }}>
-            <div
-              className="progress-bar bg-success"
-              role="progressbar"
-              style={{ width: `${value}%` }}
-              aria-valuenow={value}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              {value}%
-            </div>
-          </div>
+          <ProgressBar now={value} label={`${value}%`} />
         </div>
       );
     }
@@ -356,7 +355,7 @@ const MetadataManager = () => {
     // Handle profile/description (HTML)
     if (label.includes("Profile/Description") && typeof value === "string") {
       return (
-        <div className="mb-3">
+        <div className="mb-3" key={label}>
           <h3>{label}</h3>
           <div
             className="p-3 mb-3 border bg-light"
@@ -369,7 +368,7 @@ const MetadataManager = () => {
     // Handle null/undefined
     if (value === null || value === undefined) {
       return (
-        <div className="mb-3">
+        <div className="mb-3" key={label}>
           <h3>{label}</h3>
           <p>
             <i>None found</i>
@@ -381,7 +380,7 @@ const MetadataManager = () => {
     // If value is a primitive (string/number) and not handled above, just display it.
     if (typeof value === "string" || typeof value === "number") {
       return (
-        <div className="mb-3">
+        <div className="mb-3" key={label}>
           <h3>{label}</h3>
           <p>{value.toString()}</p>
         </div>
@@ -391,7 +390,7 @@ const MetadataManager = () => {
     // If it's an object and not null (handled in renderMetadata), we shouldn't reach here
     // because objects are handled recursively. Just in case:
     return (
-      <div className="mb-3">
+      <div className="mb-3" key={label}>
         <h3>{label}</h3>
         <pre>{JSON.stringify(value, null, 2)}</pre>
       </div>
@@ -424,7 +423,7 @@ const MetadataManager = () => {
               {val.length === 0 ? (
                 <p>None</p>
               ) : (
-                <table className="table table-striped">
+                <Table striped bordered hover responsive>
                   <thead>
                     <tr>
                       <th>Track Name</th>
@@ -451,7 +450,7 @@ const MetadataManager = () => {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </Table>
               )}
             </div>
           );
@@ -467,9 +466,9 @@ const MetadataManager = () => {
               ) : (
                 <div>
                   {val.map((genre, i) => (
-                    <span key={i} className="badge bg-secondary me-2">
+                    <Badge bg="secondary" className="me-2" key={i}>
                       {genre}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               )}
@@ -499,7 +498,7 @@ const MetadataManager = () => {
       // If it's an object (and not null), recurse deeper unless it's handled specially above.
       if (typeof val === "object" && val !== null && val.image === undefined) {
         return (
-          <div key={fullKey}>
+          <div key={fullKey} className="mb-3">
             <h3>{label}</h3>
             {renderMetadata(val, fullKey)}
           </div>
@@ -512,19 +511,20 @@ const MetadataManager = () => {
   };
 
   return (
-    <div>
-      <h1 className="mb-4 text-center">Data Ingestion!</h1>
-      <form
+    <Container>
+      <h1 className="mb-4 text-center">Data Ingestion</h1>
+      <Form
         onSubmit={(e) => {
           e.preventDefault();
           fetchMetadata();
         }}
       >
-        <div className="mb-3">
-          <label className="form-label">
+        {/* Artist Input Field */}
+        <Form.Group className="mb-3" controlId="formArtist">
+          <Form.Label>
             <i className="bi bi-person"></i> Artist
-          </label>
-          <input
+          </Form.Label>
+          <Form.Control
             type="text"
             className="form-control mb-2"
             value={artist}
@@ -533,277 +533,249 @@ const MetadataManager = () => {
             placeholder="Enter artist name"
             autoFocus // Enable autofocus for the first input
           />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">
+        </Form.Group>
+
+        {/* Album Input Field */}
+        <Form.Group className="mb-3" controlId="formAlbum">
+          <Form.Label>
             <i className="bi bi-vinyl"></i> Album
-          </label>
-          <input
+          </Form.Label>
+          <Form.Control
             type="text"
-            className="form-control mb-3"
             value={album}
             onChange={(e) => setAlbum(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Enter album name"
           />
-        </div>
+        </Form.Group>
 
-        <div className="mb-3">
-          <label className="form-label">
+        {/* Metadata Sources Selection */}
+        <Form.Group className="mb-3" controlId="formSources">
+          <Form.Label>
             <i className="bi bi-database"></i> Select Databases:
-          </label>
+          </Form.Label>
           {availableSources.length > 0 ? (
-            <div className="mb-3">
+            <div>
               {availableSources.map((source) => (
-                <div className="form-check" key={source}>
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id={source}
-                    value={source}
-                    checked={selectedSources.includes(source)}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedSources((prevSelected) =>
-                        prevSelected.includes(value)
-                          ? prevSelected.filter((s) => s !== value)
-                          : [...prevSelected, value]
-                      );
-                    }}
-                  />
-                  <label className="form-check-label" htmlFor={source}>
-                    {formatSourceName(source)}
-                  </label>
-                </div>
+                <Form.Check
+                  type="checkbox"
+                  id={source}
+                  label={formatSourceName(source)}
+                  key={source}
+                  value={source}
+                  checked={selectedSources.includes(source)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedSources((prevSelected) =>
+                      prevSelected.includes(value)
+                        ? prevSelected.filter((s) => s !== value)
+                        : [...prevSelected, value]
+                    );
+                  }}
+                  className="mb-2"
+                />
               ))}
             </div>
           ) : (
-            <p>No sources available. Please try again later.</p>
+            <Alert variant="info">No sources available. Please try again later.</Alert>
           )}
-        </div>
+        </Form.Group>
 
-        <button
+        {/* Fetch Metadata Button */}
+        <Button
+          variant="primary"
           type="submit"
           disabled={loading || availableSources.length === 0}
-          className="btn btn-primary mb-3"
+          className="mb-3"
         >
           <i className="bi bi-search"></i> Fetch Metadata
-        </button>
-      </form>
+        </Button>
+      </Form>
 
       {/* Show a loading message while fetching */}
       {loading && (
-        <p>
-          <i className="bi bi-hourglass-split"></i> Loading...
-        </p>
+        <div className="text-center my-3">
+          <Spinner animation="border" variant="primary" />
+          <span className="ms-2">Loading...</span>
+        </div>
       )}
+
       {/* Show any error messages */}
       {error && (
-        <p ref={errorRef} style={{ color: "red" }}>
-          <i className="bi bi-exclamation-circle"></i> {error}
-        </p>
+        <Alert ref={errorRef} variant="danger">
+          <i className="bi bi-exclamation-circle me-2"></i> {error}
+        </Alert>
       )}
 
+      {/* Display Metadata */}
       {metadata && (
         <div className="mt-4">
-          <div className="mb-4">
-            <div className="p-3 mb-3 border bg-success bg-opacity-25">
-              <h2 className="mb-4">{headingText}</h2>
-              {renderMetadata(metadata.identical)}
-            </div>
-          </div>
+          {/* Identical Metadata Alert */}
+          <Alert variant="success">
+            <h2>{headingText}</h2>
+            {renderMetadata(metadata.identical)}
+          </Alert>
 
           {/* If only one source was fetched, user can confirm directly */}
-          {fetchedSourcesCount === 1 ? (
+          {fetchedSourcesCount === 1 && (
             <div className="mt-4">
-              <p>
+              <Alert variant="info">
                 Please review the metadata above. If it looks correct, click the
                 button below to confirm and submit.
-              </p>
-              <button
+              </Alert>
+              <Button
+                variant="success"
                 onClick={handleConfirmSingleSource}
                 disabled={loading}
-                className="btn btn-success"
               >
-                <i className="bi bi-check-circle"></i> Confirm and Submit
-              </button>
+                <i className="bi bi-check-circle me-2"></i> Confirm and Submit
+              </Button>
             </div>
-          ) : (
-            <>
-              {/* If multiple sources are fetched, show differences for the user to resolve */}
-              {differences && Object.keys(differences).length > 0 ? (
-                <div className="mt-4">
-                  <h2 className="mb-3">Resolve Differences</h2>
-                  {Object.keys(differences).map((field) => {
-                    const label = fieldDisplayNames[field] || field;
-                    // Check if all sources return null for this field.
-                    const allNull = Object.values(differences[field]).every(
-                      (val) => val === null
-                    );
+          )}
 
-                    if (allNull) {
-                      // If all are null, we have "None" and "Custom" as options.
-                      return (
-                        <div key={field} className="mb-3">
-                          <h4>{label}</h4>
-                          <div className="form-check">
-                            <input
-                              className="form-check-input"
-                              type="radio"
-                              id={`${field}-none`}
-                              name={field}
-                              value="__NONEUSER__"
-                              onChange={() =>
-                                handleResolve(field, "__NONEUSER__")
-                              }
-                              checked={
-                                selectedResolution[field] === "__NONEUSER__"
-                              }
-                            />
-                            <label
-                              className="form-check-label"
-                              htmlFor={`${field}-none`}
-                            >
-                              None
-                            </label>
-                          </div>
-                          <div className="form-check mt-2">
-                            <input
-                              className="form-check-input"
-                              type="radio"
-                              id={`${field}-custom`}
-                              name={field}
-                              value="__CUSTOM__"
-                              onChange={() =>
-                                handleResolve(field, "__CUSTOM__")
-                              }
-                              checked={
-                                selectedResolution[field] === "__CUSTOM__"
-                              }
-                            />
-                            <label
-                              className="form-check-label"
-                              htmlFor={`${field}-custom`}
-                            >
-                              Custom
-                            </label>
-                          </div>
-                          {selectedResolution[field] === "__CUSTOM__" && (
+          {/* If multiple sources are fetched, show differences for the user to resolve */}
+          {fetchedSourcesCount > 1 && differences && Object.keys(differences).length > 0 && (
+            <div className="mt-4">
+              <h2 className="mb-3">Resolve Differences</h2>
+              {Object.keys(differences).map((field) => {
+                const label = fieldDisplayNames[field] || field;
+                const allNull = Object.values(differences[field]).every(
+                  (val) => val === null
+                );
+
+                if (allNull) {
+                  // If all are null, we have "None" and "Custom" as options.
+                  return (
+                    <div key={field} className="mb-4">
+                      <h4>{label}</h4>
+                      <Form.Check
+                        type="radio"
+                        id={`${field}-none`}
+                        name={field}
+                        label="None"
+                        value="__NONEUSER__"
+                        onChange={() =>
+                          handleResolve(field, "__NONEUSER__")
+                        }
+                        checked={
+                          selectedResolution[field] === "__NONEUSER__"
+                        }
+                        className="mb-2"
+                      />
+                      <Form.Check
+                        type="radio"
+                        id={`${field}-custom`}
+                        name={field}
+                        label="Custom"
+                        value="__CUSTOM__"
+                        onChange={() =>
+                          handleResolve(field, "__CUSTOM__")
+                        }
+                        checked={
+                          selectedResolution[field] === "__CUSTOM__"
+                        }
+                      />
+                      {selectedResolution[field] === "__CUSTOM__" && (
+                        <div className="mt-2">
+                          <Form.Control
+                            type="text"
+                            placeholder={`Enter custom ${label.toLowerCase()}`}
+                            value={customValues[field] || ""}
+                            onChange={(e) =>
+                              setCustomValues((prev) => ({
+                                ...prev,
+                                [field]: e.target.value,
+                              }))
+                            }
+                          />
+                          {isImageUrl(customValues[field]) && (
                             <div className="mt-2">
-                              <input
-                                type="text"
-                                className="form-control"
-                                value={customValues[field] || ""}
-                                onChange={(e) => {
-                                  setCustomValues((prev) => ({
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() =>
+                                  setCustomImagePreviews((prev) => ({
                                     ...prev,
-                                    [field]: e.target.value,
-                                  }));
-                                }}
-                              />
-                              {isImageUrl(customValues[field]) && (
-                                <div className="mt-2">
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-outline-primary"
-                                    onClick={() =>
-                                      setCustomImagePreviews((prev) => ({
-                                        ...prev,
-                                        [field]: !prev[field],
-                                      }))
-                                    }
-                                  >
-                                    {customImagePreviews[field]
-                                      ? "Hide Preview"
-                                      : "Preview Image"}
-                                  </button>
-                                  {customImagePreviews[field] && (
-                                    <div className="mt-2">
-                                      <img
-                                        src={customValues[field]}
-                                        alt="Custom Preview"
-                                        style={{
-                                          maxWidth: "200px",
-                                          borderRadius: "8px",
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
+                                    [field]: !prev[field],
+                                  }))
+                                }
+                                className="me-2"
+                              >
+                                {customImagePreviews[field]
+                                  ? "Hide Preview"
+                                  : "Preview Image"}
+                              </Button>
+                              {customImagePreviews[field] && (
+                                <img
+                                  src={customValues[field]}
+                                  alt="Custom Preview"
+                                  style={{
+                                    maxWidth: "200px",
+                                    borderRadius: "8px",
+                                  }}
+                                  className="img-fluid mt-2"
+                                />
                               )}
                             </div>
                           )}
                         </div>
-                      );
-                    }
+                      )}
+                    </div>
+                  );
+                }
 
-                    // If there are some actual values, list each source's value as a choice.
-                    return (
-                      <div key={field} className="mb-4">
-                        <h4>{label}</h4>
-                        {Object.entries(differences[field]).map(
-                          ([source, value]) => {
-                            const displaySource = formatSourceName(source);
+                // If there are some actual values, list each source's value as a choice.
+                return (
+                  <div key={field} className="mb-4">
+                    <h4>{label}</h4>
+                    {Object.entries(differences[field]).map(
+                      ([source, value]) => {
+                        const displaySource = formatSourceName(source);
 
-                            if (value === null) {
-                              // Handle null case as before
-                              return (
-                                <div className="form-check" key={source}>
-                                  <input
-                                    className="form-check-input"
-                                    type="radio"
-                                    id={`${field}-${source}`}
-                                    name={field}
-                                    value="__NONEFOUND__"
-                                    disabled={true}
-                                  />
-                                  <label
-                                    className="form-check-label"
-                                    htmlFor={`${field}-${source}`}
-                                  >
-                                    {displaySource}: <em>None found</em>
-                                  </label>
-                                </div>
-                              );
-                            }
+                        if (value === null) {
+                          // Handle null case as before
+                          return (
+                            <div className="form-check mb-2" key={source}>
+                              <Form.Check
+                                type="radio"
+                                id={`${field}-${source}`}
+                                name={field}
+                                label={`${displaySource}: `}
+                                value="__NONEFOUND__"
+                                disabled={true}
+                                className="me-2"
+                              />
+                              <em>None found</em>
+                            </div>
+                          );
+                        }
 
-                            // Decide how to display the value
-                            let displayValue;
-                            if (Array.isArray(value)) {
-                              // If it's an array, join by commas or line breaks for a nicer view
-                              displayValue =
-                                value.length > 0 ? value.join(", ") : "None";
-                            } else if (typeof value === "object") {
-                              // If it's an object, optionally format as JSON or handle specially
-                              displayValue = JSON.stringify(value, null, 2);
-                            } else {
-                              // For strings/numbers, just display as is
-                              displayValue = value;
-                            }
+                        // Decide how to display the value
+                        let displayValue;
+                        if (Array.isArray(value)) {
+                          // If it's an array, join by commas or line breaks for a nicer view
+                          displayValue =
+                            value.length > 0 ? value.join(", ") : "None";
+                        } else if (typeof value === "object") {
+                          // If it's an object, optionally format as JSON or handle specially
+                          displayValue = JSON.stringify(value, null, 2);
+                        } else {
+                          // For strings/numbers, just display as is
+                          displayValue = value;
+                        }
 
-                            const radioValue = JSON.stringify(value);
+                        const radioValue = JSON.stringify(value);
 
-                            return (
-                              <div className="form-check" key={source}>
-                                <input
-                                  className="form-check-input"
-                                  type="radio"
-                                  id={`${field}-${source}`}
-                                  name={field}
-                                  value={radioValue}
-                                  onChange={() =>
-                                    handleResolve(field, radioValue)
-                                  }
-                                  checked={
-                                    selectedResolution[field] === radioValue
-                                  }
-                                />
-                                <label
-                                  className="form-check-label"
-                                  htmlFor={`${field}-${source}`}
-                                >
+                        return (
+                          <div className="form-check mb-2" key={source}>
+                            <Form.Check
+                              type="radio"
+                              id={`${field}-${source}`}
+                              name={field}
+                              label={
+                                <>
                                   {displaySource}:
-                                  {field.toLowerCase().includes("profile") &&
+                                  {label.toLowerCase().includes("profile") &&
                                   typeof value === "string" ? (
                                     <div
                                       className="border bg-light p-2 d-inline-block ms-2"
@@ -811,7 +783,7 @@ const MetadataManager = () => {
                                         __html: value,
                                       }}
                                     />
-                                  ) : field.toLowerCase().includes("image") &&
+                                  ) : label.toLowerCase().includes("image") &&
                                     typeof value === "string" ? (
                                     <img
                                       src={value}
@@ -826,127 +798,129 @@ const MetadataManager = () => {
                                       {displayValue}
                                     </pre>
                                   )}
-                                </label>
-                                {/* Edit button */}
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-link"
-                                  onClick={() => {
-                                    handleResolve(field, "__CUSTOM__");
-                                    setCustomValues((prev) => ({
-                                      ...prev,
-                                      [field]:
-                                        typeof value === "object"
-                                          ? JSON.stringify(value)
-                                          : value,
-                                    }));
-                                  }}
-                                >
-                                  <i className="bi bi-pencil"></i> Edit
-                                </button>
-                              </div>
-                            );
+                                </>
+                              }
+                              value={radioValue}
+                              onChange={() => handleResolve(field, radioValue)}
+                              checked={selectedResolution[field] === radioValue}
+                            />
+                            {/* Edit button */}
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() => {
+                                handleResolve(field, "__CUSTOM__");
+                                setCustomValues((prev) => ({
+                                  ...prev,
+                                  [field]:
+                                    typeof value === "object"
+                                      ? JSON.stringify(value)
+                                      : value,
+                                }));
+                              }}
+                              className="ms-2 p-0"
+                            >
+                              <i className="bi bi-pencil"></i> Edit
+                            </Button>
+                          </div>
+                        );
+                      }
+                    )}
+
+                    {/* None Option */}
+                    <Form.Check
+                      type="radio"
+                      id={`${field}-none`}
+                      name={field}
+                      label="None"
+                      value="__NONEUSER__"
+                      onChange={() => handleResolve(field, "__NONEUSER__")}
+                      checked={selectedResolution[field] === "__NONEUSER__"}
+                      className="mb-2"
+                    />
+
+                    {/* Custom Option */}
+                    <Form.Check
+                      type="radio"
+                      id={`${field}-custom`}
+                      name={field}
+                      label="Custom"
+                      value="__CUSTOM__"
+                      onChange={() => handleResolve(field, "__CUSTOM__")}
+                      checked={selectedResolution[field] === "__CUSTOM__"}
+                      className="mb-2"
+                    />
+
+                    {/* Custom Input Field */}
+                    {selectedResolution[field] === "__CUSTOM__" && (
+                      <div className="mt-2">
+                        <Form.Control
+                          type="text"
+                          placeholder={`Enter custom ${label.toLowerCase()}`}
+                          value={customValues[field] || ""}
+                          onChange={(e) =>
+                            setCustomValues((prev) => ({
+                              ...prev,
+                              [field]: e.target.value,
+                            }))
                           }
+                        />
+                        {isImageUrl(customValues[field]) && (
+                          <div className="mt-2">
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={() =>
+                                setCustomImagePreviews((prev) => ({
+                                  ...prev,
+                                  [field]: !prev[field],
+                                }))
+                              }
+                              className="me-2"
+                            >
+                              {customImagePreviews[field]
+                                ? "Hide Preview"
+                                : "Preview Image"}
+                            </Button>
+                            {customImagePreviews[field] && (
+                              <img
+                                src={customValues[field]}
+                                alt="Custom Preview"
+                                style={{
+                                  maxWidth: "200px",
+                                  borderRadius: "8px",
+                                }}
+                                className="img-fluid mt-2"
+                              />
+                            )}
+                          </div>
                         )}
-
-                        <div className="form-check mt-2">
-                          <input
-                            className="form-check-input"
-                            type="radio"
-                            id={`${field}-none`}
-                            name={field}
-                            value="__NONEUSER__"
-                            onChange={() =>
-                              handleResolve(field, "__NONEUSER__")
-                            }
-                            checked={
-                              selectedResolution[field] === "__NONEUSER__"
-                            }
-                          />
-                          <label
-                            className="form-check-label"
-                            htmlFor={`${field}-none`}
-                          >
-                            None
-                          </label>
-                        </div>
-
-                        <div className="form-check mt-2">
-                          <input
-                            className="form-check-input"
-                            type="radio"
-                            id={`${field}-custom`}
-                            name={field}
-                            value="__CUSTOM__"
-                            onChange={() => handleResolve(field, "__CUSTOM__")}
-                            checked={selectedResolution[field] === "__CUSTOM__"}
-                          />
-                          <label
-                            className="form-check-label"
-                            htmlFor={`${field}-custom`}
-                          >
-                            Custom
-                          </label>
-                        </div>
-                        {selectedResolution[field] === "__CUSTOM__" && (
-  <div className="mt-2">
-    <input
-      type="text"
-      className="form-control"
-      value={customValues[field] || ""}
-      onChange={(e) => {
-        setCustomValues((prev) => ({
-          ...prev,
-          [field]: e.target.value,
-        }));
-      }}
-    />
-    {isImageUrl(customValues[field]) && (
-      <div className="mt-2">
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-primary"
-          onClick={() =>
-            setCustomImagePreviews((prev) => ({
-              ...prev,
-              [field]: !prev[field],
-            }))
-          }
-        >
-          {customImagePreviews[field] ? "Hide Preview" : "Preview Image"}
-        </button>
-        {customImagePreviews[field] && (
-          <div className="mt-2">
-            <img
-              src={customValues[field]}
-              alt="Custom Preview"
-              style={{ maxWidth: "200px", borderRadius: "8px" }}
-            />
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-)}
                       </div>
-                    );
-                  })}
-                  <button
-                    onClick={uploadResolution}
-                    disabled={loading}
-                    className="btn btn-primary"
-                  >
-                    Upload Resolution
-                  </button>
-                </div>
-              ) : (
-                <p>No differences found between metadata sources.</p>
-              )}
-            </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Upload Resolution Button */}
+              <Button
+                variant="primary"
+                onClick={uploadResolution}
+                disabled={loading}
+              >
+                Upload Resolution
+              </Button>
+            </div>
+          )}
+
+          {/* No Differences Found */}
+          {metadata && fetchedSourcesCount > 1 && !differences && (
+            <Alert variant="info" className="mt-4">
+              No differences found between metadata sources.
+            </Alert>
           )}
         </div>
       )}
-    </div>
+    </Container>
   );
 };
 

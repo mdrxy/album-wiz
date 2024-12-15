@@ -1,46 +1,41 @@
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
+import { Navbar, Nav, Container } from 'react-bootstrap';
 import MetadataManager from "./components/MetadataManager";
+import ImageUploader from "./components/ImageUploader"; 
+import Library from "./components/Library";
 
 const App = () => {
   return (
     <div>
-      {/* A simple Navbar */}
-      <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div className="container-fluid">
-          <Link className="navbar-brand" to="/">
+      {/* Navbar */}
+      <Navbar bg="dark" variant="dark" expand="lg">
+        <Container fluid>
+          <Navbar.Brand as={Link} to="/">
             album-wiz
-          </Link>
-          <button
-            className="navbar-toggler"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent"
-            aria-expanded="false"
-            aria-label="Toggle navigation"
-          >
-            <span className="navbar-toggler-icon"></span>
-          </button>
-          <div className="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul className="navbar-nav me-auto mb-2 mb-lg-0">
-              <li className="nav-item">
-                <Link className="nav-link" to="/metadata">
-                  Metadata Manager
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </nav>
+          </Navbar.Brand>
+          <Navbar.Toggle aria-controls="navbar-nav" />
+          <Navbar.Collapse id="navbar-nav">
+            <Nav className="me-auto">
+              <Nav.Link as={Link} to="/metadata">
+                Metadata Manager
+              </Nav.Link>
+              <Nav.Link as={Link} to="/library">
+                Library
+              </Nav.Link>
+            </Nav>
+          </Navbar.Collapse>
+        </Container>
+      </Navbar>
 
-      {/* Main content area */}
-      <div className="container mt-4">
+      {/* Main Content Area */}
+      <Container className="mt-4">
         <Routes>
-          <Route path="/" element={<h2 className="text-center">Home</h2>} />
+          <Route path="/" element={<ImageUploader />} />
           <Route path="/metadata" element={<MetadataManager />} />
+          <Route path="/library" element={<Library />} />
         </Routes>
-      </div>
+      </Container>
     </div>
   );
 };
