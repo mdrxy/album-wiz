@@ -12,5 +12,9 @@ curl -X POST "http://127.0.0.1:8000/api/albums" \
     -H "Content-Type: multipart/form-data" \
     -F "file=@/app/import.csv"
 
+# Vectorize the data
+echo "Starting vectorization..."
+curl -X GET "http://127.0.0.1:8000/api/vectorize"
+
 # Keep the container running
 wait

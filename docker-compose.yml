@@ -7,6 +7,7 @@ services:
       - ./frontend:/app # Mounts the entire local frontend directory as `/app` in the container
       - /app/node_modules # Prevents the node_modules directory from being overridden by the container
         # (avoid conflicts between the dependencies installed on the host machine and those installed inside the container)
+      - ./database/sample_data/images:/app/media # Shared volume for album art and other media files
     environment:
       # Variables that can be accessed in the frontend application
       - REACT_APP_API_BASE_URL # `/api`
@@ -28,10 +29,12 @@ services:
     container_name: vinyl-backend
     volumes:
       - ./backend:/app
-      - media:/media # Shared volume for album art and other media files
+      - ./database/sample_data/images:/media
+      - ./database/sample_data/import.csv:/app/import.csv
     environment:
       - DATABASE_URL
       - REDIS_URL
+      - MEDIA_DIR
     env_file:
       - .env
     depends_on:
@@ -57,6 +60,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data (allows data to outlive container restarts/builds)
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with our custom SQL init script
+      - ./database/sample_data/images:/media
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -98,8 +102,6 @@ services:
     build:
       context: ./vector-search
     container_name: vinyl-vector-search
-    volumes:
-      - media:/media # Shared volume for accessing media files during vector processing
     environment:
       - DATABASE_URL
     env_file:
@@ -118,6 +120,7 @@ services:
       - ./frontend/build:/usr/share/nginx/html:ro # Mount the built folder of the frontend app
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # Bind mount the config file. 'ro' ensures read-only access meaning the container can't modify the file on the host
       - ./nginx/favicon.ico:/etc/nginx/favicon.ico:ro # Bind mount the favicon
+      - ./database/sample_data/images:/media:ro
     depends_on:
       - frontend
       - backend
@@ -129,7 +132,6 @@ services:
 volumes:
   postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
   redis_data: # Persistent volume for the Redis cache
-  media: # Shared volume for storing album art
 
 networks:
   vinyl-network:

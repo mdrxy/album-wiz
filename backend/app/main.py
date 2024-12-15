@@ -13,10 +13,13 @@ from typing import AsyncGenerator, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
 import asyncpg
 from PIL import Image
+from fastapi.staticfiles import StaticFiles
 
-from app import normalize, query
+from app import normalize
 from app.metadata_orchestrator import MetadataOrchestrator
 from app.import_albums import import_albums
+from app.process.utils import validate_image, get_image
+from app.process.logic import extract_album_cover, vectorize_image, match_vector
 
 
 # Configure logging
@@ -55,6 +58,8 @@ app = FastAPI(lifespan=lifespan)
 router = APIRouter()
 orchestrator = MetadataOrchestrator()
 
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+
 
 @router.get("/")
 async def read_root():
@@ -62,6 +67,187 @@ async def read_root():
     Default route to test if the API is running.
     """
     return {"message": "Hello, World!"}
+
+
+@router.post("/upload")
+async def upload_image(image: UploadFile = File(...)):
+    """
+    Endpoint to receive an image file from the homepage.
+
+    Args:
+    - file (UploadFile): The image file to save.
+
+    Returns:
+    - JSON with the matched album or an error message.
+    """
+    # if not image.filename.endswith((".jpg", ".jpeg", ".png")):
+    #     raise HTTPException(
+    #         status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
+    #     )
+
+    # # Step 1: Validate the uploaded image
+    # if not await validate_image(image):
+    #     raise HTTPException(status_code=400, detail="Invalid image file.")
+
+    # # Step 2: Extract the album cover from the image
+    # album_cover = await extract_album_cover(image)
+    # if not album_cover:
+    #     raise HTTPException(status_code=400, detail="No album cover found in the image")
+
+    # # Step 3: Vectorize the extracted album cover
+    # image_vector = await vectorize_image(album_cover)
+    # if not image_vector:
+    #     raise HTTPException(status_code=500, detail="Failed to vectorize the image")
+
+    # # Step 4: Query the database for the most similar records
+    # matched_records = await match_vector(image_vector)
+
+    # # Step 5: Return the album metadata
+    # # return matched_album
+
+    return {
+        "artist_name": "Radiohead",
+        "album_name": "OK Computer",
+        "genres": [
+            "Alternative Rock",
+            "Art Rock",
+            "Progressive Rock",
+            "Electronic",
+            "Experimental",
+        ],
+        "artist_image": "https://i.scdn.co/image/ab6761610000e5eba03696716c9ee605006047fd",
+        "album_image": "https://static.independent.co.uk/s3fs-public/thumbnails/image/2017/05/10/11/ok-computer.png",
+        "release_date": "1997-05",
+        "total_tracks": 12,
+        "total_duration": 3230,
+        "tracks": [
+            {"name": "Airbag", "duration": 295, "explicit": True},
+            {"name": "Paranoid Android", "duration": 386, "explicit": None},
+            {"name": "Subterranean Homesick Alien", "duration": 269, "explicit": False},
+            {"name": "Exit Music (For a Film)", "duration": 270, "explicit": False},
+            {"name": "Let Down", "duration": 295, "explicit": False},
+            {"name": "Karma Police", "duration": 258, "explicit": False},
+            {"name": "Fitter Happier", "duration": 90, "explicit": False},
+            {"name": "Electioneering", "duration": 270, "explicit": False},
+            {"name": "Climbing Up the Walls", "duration": 297, "explicit": False},
+            {"name": "No Surprises", "duration": 228, "explicit": False},
+            {"name": "Lucky", "duration": 303, "explicit": None},
+            {"name": "The Tourist", "duration": 269, "explicit": True},
+        ],
+        "artist_url": "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
+        "album_url": "https://open.spotify.com/album/2fGCAYUMssLKiUAoNdxGLx",
+    }
+
+
+@router.post("/album")
+async def upload_album(data: dict):
+    """
+    Endpoint to receive album metadata and store it in the database.
+
+    Args:
+    - data (dict): Album metadata to store in the database.
+
+    Required keys:
+    - artist_name (str): Name of the artist.
+    - album_name (str): Name of the album.
+    - genres (list): List of genres.
+    - artist_image (str): URL to the artist image.
+    - album_image (str): URL to the album image.
+    - release_date (str): Release date of the album.
+    - total_tracks (int): Total number of tracks.
+    - tracks (list): List of track metadata dictionaries.
+    - artist_url (str): URL to the artist's page.
+    - album_url (str): URL to the album
+
+    Returns:
+    - A success message if the metadata is stored successfully.
+    """
+    async with app.state.pool.acquire() as connection:
+        try:
+            # Insert artist
+            artist_id = await connection.fetchval(
+                """
+                INSERT INTO artists (name, image, url)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (name) DO UPDATE
+                SET image = EXCLUDED.image, url = EXCLUDED.url
+                RETURNING id;
+                """,
+                data["artist_name"],
+                data["artist_image"],
+                data["artist_url"],
+            )
+
+            # Insert album
+            album_id = await connection.execute(
+                """
+                INSERT INTO albums (title, artist_id, image, url, release_date, genres, total_tracks)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT DO NOTHING;
+                """,
+                data["album_name"],
+                artist_id,
+                data["album_image"],
+                data["album_url"],
+                data["release_date"],
+                data["genres"],
+                data["total_tracks"],
+            )
+
+            # Insert tracks
+            for track in data["tracks"]:
+                await connection.execute(
+                    """
+                    INSERT INTO tracks (album_id, title, duration, explicit)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT DO NOTHING;
+                    """,
+                    album_id,
+                    track["name"],
+                    track["duration"],
+                    track["explicit"],
+                )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/album/{album_id}")
+async def delete_album(album_id: int):
+    """
+    Endpoint to delete an album record from the database.
+    If the album is the only one by the artist, the artist will be deleted as well.
+    """
+    async with app.state.pool.acquire() as connection:
+        try:
+            # Start a transaction
+            async with connection.transaction():
+                # Get the artist ID of the album
+                artist_id = await connection.fetchval(
+                    "SELECT artist_id FROM albums WHERE id = $1;", album_id
+                )
+                if not artist_id:
+                    raise HTTPException(status_code=404, detail="Album not found.")
+
+                # Delete the album
+                await connection.execute("DELETE FROM albums WHERE id = $1;", album_id)
+
+                # Check if the artist has any other albums
+                remaining_albums = await connection.fetchval(
+                    "SELECT COUNT(*) FROM albums WHERE artist_id = $1;", artist_id
+                )
+
+                # If no albums remain, delete the artist
+                if remaining_albums == 0:
+                    await connection.execute(
+                        "DELETE FROM artists WHERE id = $1;", artist_id
+                    )
+
+            return {
+                "message": "Album (and artist, if applicable) deleted successfully."
+            }
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/albums")
@@ -98,6 +284,47 @@ async def upload_csv(file: UploadFile = File(...)):
         ) from e
 
 
+@router.get("/vectorize")
+async def vectorize_albums():
+    """
+    Endpoint to vectorize all album covers in the database.
+    """
+    logger.debug("Starting vectorization of album covers.")
+    try:
+        async with app.state.pool.acquire() as connection:
+            sql_query = "SELECT * FROM albums WHERE embedding IS NULL;"
+            rows = await connection.fetch(sql_query)
+            logger.debug("Fetched %d albums to vectorize.", len(rows))
+            for row in rows:
+                album_id = row["id"]
+                image_path = row["cover_image"]
+                logger.debug(
+                    "Processing album ID %d with image path %s.", album_id, image_path
+                )
+
+                image = await get_image(image_path)
+                logger.debug("Image retrieved successfully for album ID %d.", album_id)
+                image_vector = await vectorize_image(image)
+                if image_vector:
+                    logger.debug(
+                        "Vectorized image successfully for album ID. Size: %s, ID: %d.",
+                        len(image_vector),
+                        album_id,
+                    )
+
+                    # TODO: get the encoding and use here
+
+                    sql_query = "UPDATE albums SET embedding = $1 WHERE id = $2;"
+                    await connection.execute(sql_query, image_vector, album_id)
+                    logger.debug(
+                        "Vector updated successfully for album ID %d.", album_id
+                    )
+            return {"message": "Albums vectorized successfully."}
+    except Exception as e:
+        logger.error("Error during vectorization: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/db/{table_name}")
 async def get_table_data(table_name: str):
     """
@@ -121,18 +348,20 @@ async def upload_resolution(data: dict):
     """
     Accept resolved metadata and store it in the database.
     """
-    try:
-        async with app.state.pool.acquire() as connection:
-            sql_query = """
-                INSERT INTO resolved_metadata (search_query, resolution)
-                VALUES ($1, $2)
-                ON CONFLICT (search_query) DO UPDATE
-                SET resolution = EXCLUDED.resolution
-            """
-            await connection.execute(sql_query, data["query"], data["resolution"])
-        return {"message": "Resolution uploaded successfully."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    # TODO
+
+    # try:
+    #     async with app.state.pool.acquire() as connection:
+    #         sql_query = """
+    #             INSERT INTO resolved_metadata (search_query, resolution)
+    #             VALUES ($1, $2)
+    #             ON CONFLICT (search_query) DO UPDATE
+    #             SET resolution = EXCLUDED.resolution
+    #         """
+    #         await connection.execute(sql_query, data["query"], data["resolution"])
+    #     return {"message": "Resolution uploaded successfully."}
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 def hashify(value):
@@ -323,7 +552,7 @@ async def vectorize(file: UploadFile = File(...)):
     """
     Endpoint to receive an image file and convert it to a PIL image.
     """
-    logger.debug("Received file: %s", file.filename)
+    logger.debug("Received file: %s", file)
     try:
         contents = await file.read()
         logger.debug("File contents read successfully.")
@@ -334,12 +563,12 @@ async def vectorize(file: UploadFile = File(...)):
         square_image = normalize.crop_to_square(image)
         logger.debug("Image cropped to square successfully.")
 
-        vector = query.vectorize(square_image)
+        vector = vectorize(square_image)
         logger.debug("Image vectorized successfully.")
 
         logger.debug("Vector: %s", vector)
 
-        return {"message": "Image successfully converted", "vector": vector.tolist()}
+        return {"message": "Image successfully converted", "vector": vector}
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

@@ -512,7 +512,7 @@ const MetadataManager = () => {
 
   return (
     <Container>
-      <h1 className="mb-4 text-center">Data Ingestion</h1>
+      <h2 className="mb-4 text-center">Data Ingestion</h2>
       <Form
         onSubmit={(e) => {
           e.preventDefault();

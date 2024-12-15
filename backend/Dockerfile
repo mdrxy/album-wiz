@@ -21,9 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the backend code to the working directory
 COPY . .
 
-# Copy the import.csv file into the container
-COPY import.csv /app/import.csv
-
 # Copy the startup script
 COPY startup.sh /app/startup.sh
 RUN chmod +x /app/startup.sh

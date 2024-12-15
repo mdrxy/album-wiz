@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 node_modules/
+backend/import.csv
+.DS_Store
