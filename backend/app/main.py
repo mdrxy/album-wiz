@@ -77,33 +77,32 @@ async def upload_image(image: UploadFile = File(...)):
     Returns:
     - JSON with the matched album or an error message.
     """
-    if not image.filename.endswith((".jpg", ".jpeg", ".png")):
-        raise HTTPException(
-            status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
-        )
+    # if not image.filename.endswith((".jpg", ".jpeg", ".png")):
+    #     raise HTTPException(
+    #         status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
+    #     )
 
-    # Step 1: Validate the uploaded image
-    if not await validate_image(image):
-        raise HTTPException(status_code=400, detail="Invalid image file.")
+    # # Step 1: Validate the uploaded image
+    # if not await validate_image(image):
+    #     raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    # Step 2: Extract the album cover from the image
-    album_cover = await extract_album_cover(image)
-    if not album_cover:
-        raise HTTPException(status_code=400, detail="No album cover found in the image")
+    # # Step 2: Extract the album cover from the image
+    # album_cover = await extract_album_cover(image)
+    # if not album_cover:
+    #     raise HTTPException(status_code=400, detail="No album cover found in the image")
 
-    # Step 3: Vectorize the extracted album cover
-    image_vector = await vectorize_image(album_cover)
-    if not image_vector:
-        raise HTTPException(status_code=500, detail="Failed to vectorize the image")
+    # # Step 3: Vectorize the extracted album cover
+    # image_vector = await vectorize_image(album_cover)
+    # if not image_vector:
+    #     raise HTTPException(status_code=500, detail="Failed to vectorize the image")
 
-    # Step 4: Query the database for the most similar records
-    matched_records = await match_vector(image_vector)
+    # # Step 4: Query the database for the most similar records
+    # matched_records = await match_vector(image_vector)
 
-    # Step 5: Return the album metadata
-    # return matched_album
+    # # Step 5: Return the album metadata
+    # # return matched_album
 
-    return 
-{
+    return {
         "artist_name": "Radiohead",
         "album_name": "OK Computer",
         "genres": [
@@ -113,7 +112,8 @@ async def upload_image(image: UploadFile = File(...)):
             "Electronic",
             "Experimental",
         ],
-        "image": "https://i.scdn.co/image/ab6761610000e5eba03696716c9ee605006047fd",
+        "artist_image": "https://i.scdn.co/image/ab6761610000e5eba03696716c9ee605006047fd",
+        "album_image": "https://static.independent.co.uk/s3fs-public/thumbnails/image/2017/05/10/11/ok-computer.png",
         "release_date": "1997-05",
         "total_tracks": 12,
         "tracks": [
@@ -130,8 +130,100 @@ async def upload_image(image: UploadFile = File(...)):
             {"name": "Lucky", "duration": 303, "explicit": None},
             {"name": "The Tourist", "duration": 269, "explicit": True},
         ],
-        "url": "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
+        "artist_url": "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
+        "album_url": "https://open.spotify.com/album/2fGCAYUMssLKiUAoNdxGLx",
     }
+
+
+@router.post("/album")
+async def upload_album(data: dict):
+    """
+    Endpoint to receive album metadata and store it in the database.
+
+    Args:
+    - data (dict): Album metadata to store in the database.
+
+    Required keys:
+    - artist_name (str): Name of the artist.
+    - album_name (str): Name of the album.
+    - genres (list): List of genres.
+    - artist_image (str): URL to the artist image.
+    - album_image (str): URL to the album image.
+    - release_date (str): Release date of the album.
+    - total_tracks (int): Total number of tracks.
+    - tracks (list): List of track metadata dictionaries.
+    - artist_url (str): URL to the artist's page.
+    - album_url (str): URL to the album
+
+    Returns:
+    - A success message if the metadata is stored successfully.
+    """
+    async with app.state.pool.acquire() as connection:
+        try:
+            # Insert artist
+            artist_id = await connection.fetchval(
+                """
+                INSERT INTO artists (name, image, url)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (name) DO UPDATE
+                SET image = EXCLUDED.image, url = EXCLUDED.url
+                RETURNING id;
+                """,
+                data["artist_name"],
+                data["artist_image"],
+                data["artist_url"],
+            )
+
+            # Insert album
+            album_id = await connection.execute(
+                """
+                INSERT INTO albums (title, artist_id, image, url, release_date, genres, total_tracks)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT DO NOTHING;
+                """,
+                data["album_name"],
+                artist_id,
+                data["album_image"],
+                data["album_url"],
+                data["release_date"],
+                data["genres"],
+                data["total_tracks"],
+            )
+
+            # Insert tracks
+            for track in data["tracks"]:
+                await connection.execute(
+                    """
+                    INSERT INTO tracks (album_id, title, duration, explicit)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT DO NOTHING;
+                    """,
+                    album_id,
+                    track["name"],
+                    track["duration"],
+                    track["explicit"],
+                )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/album/{album_id}")
+async def delete_album(album_id: int):
+    """
+    Endpoint to delete an album record from the database.
+
+    Args:
+    - album_id (int): ID of the album record to delete.
+
+    Returns:
+    - A success message if the record is deleted successfully.
+    """
+    async with app.state.pool.acquire() as connection:
+        try:
+            await connection.execute("DELETE FROM albums WHERE id = $1;", album_id)
+            return {"message": "Album deleted successfully."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/albums")
