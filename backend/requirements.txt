@@ -13,3 +13,4 @@ spotipy
 python-dotenv
 musicbrainzngs
 pandas
+torchvision
