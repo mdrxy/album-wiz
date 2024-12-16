@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException
 import asyncpg
 import query
-import normalize
+import backend.app.square as square
 from fastapi import UploadFile, File
 from PIL import Image
 import io

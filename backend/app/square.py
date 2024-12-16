@@ -54,15 +54,38 @@ def lines_proximity(line_1, line_2, threshold):
 
 def find_lines_intersection(line_1, line_2):
     x1, y1, x2, y2 = line_1
-    slope_1 = (y2-y1) / (x2-x1)
-    intercept_1 = y1 - slope_1 * x1
+    vertical_1 = False
+
+    if x1 != x2:
+        slope_1 = (y2-y1) / (x2-x1)
+    else:
+        vertical_1 = True
 
     x3, y3, x4, y4 = line_2
-    slope_2 = (y4-y3) / (x4-x3)
-    intercept_2 = y3 - slope_2 * x3
+    vertical_2 = False
 
-    x_intersect = (intercept_2 - intercept_1) / (slope_1 - slope_2)
-    y_intersect = x_intersect * slope_1 + intercept_1
+    if x3 != x4:
+        slope_2 = (y4-y3) / (x4-x3)
+    else:
+        vertical_2 = True
+
+    if vertical_1:
+        x_intersect = x1
+        y_intersect = slope_2 * x_intersect + (y3 - slope_2 * x3)
+    
+    elif vertical_2:
+        x_intersect = x3
+        y_intersect = slope_1 * x_intersect + (y1 - slope_1 * x1)
+
+    elif vertical_1 and vertical_2:
+        return None, None
+    
+    else:
+        intercept_1 = y1 - slope_1 * x1
+        intercept_2 = y3 - slope_2 * x3
+        x_intersect = (intercept_2 - intercept_1) / (slope_1 - slope_2)
+        y_intersect = x_intersect * slope_1 + intercept_1
+
 
     return (x_intersect, y_intersect)
 
@@ -181,14 +204,16 @@ def find_corners_from_lines(line_pairs):
     for line_1 in pair_1:
         for line_2 in pair_2:
             x_intersect, y_intersect = find_lines_intersection(line_1, line_2)
+            if x_intersect is None and y_intersect is None:
+                return None
             corners.append((x_intersect, y_intersect))
-            x1, y1, x2, y2 = line_1
-            x3, y3, x4, y4 = line_2
-            plt.plot([x1, x2], [y1,y2], color='red')
-            plt.plot([x3, x4], [y3,y4], color='red')
-            plt.plot(x_intersect, y_intersect, 'bo')
-    plt.imshow(img)
-    plt.show()
+    #         x1, y1, x2, y2 = line_1
+    #         x3, y3, x4, y4 = line_2
+    #         plt.plot([x1, x2], [y1,y2], color='red')
+    #         plt.plot([x3, x4], [y3,y4], color='red')
+    #         plt.plot(x_intersect, y_intersect, 'bo')
+    # plt.imshow(img)
+    # plt.show()
 
     return corners
 
@@ -209,6 +234,9 @@ def detect_corners(img):
     best_pairs = find_most_parallel_pairs(unique_lines, proximity_threshold)
 
     corners = find_corners_from_lines(best_pairs)
+
+    if corners is None:
+        return None
 
     for corner in corners:
         if not (0 <= corner[0] <= width and 0 <= corner[1] <= height):
@@ -290,11 +318,13 @@ def crop_to_square(image: Image):
 total_imgs = 0
 correct_imgs = 0
 
-for filename in glob.glob("backend/app/test_images/*"): 
+# for filename in glob.glob("backend/app/test_images/*"): 
+for filename in glob.glob("backend/app/working_inputs/*"): 
 # for filename in ['backend/app/test_images/IMG_5415.JPG']:
 # for filename in ['backend/app/test_images/IMG_5359-0049.jpg']:
 # for filename in ['backend/app/test_images/IMG_5348-0001.jpg']:
 # for filename in ['backend/app/test_images/IMG_5353-0013.jpg']:
+# for filename in ['backend/app/test_images/IMG_5356-0036.jpg']:
     total_imgs += 1
     print("IMAGE: ", filename)
     img = Image.open(filename)
@@ -324,7 +354,7 @@ for filename in glob.glob("backend/app/test_images/*"):
             print("Successfully transformed image")
             idx = len('backend/app/test_images/')
             new_filename = filename[idx:]
-            warped_img.save(f"backend/app/test_outputs/output_{new_filename}")
+            # warped_img.save(f"backend/app/test_outputs/output_{new_filename}")
             # plt.imshow(warped_img)
             # plt.title("warped image")
             # plt.show()
