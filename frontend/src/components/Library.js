@@ -83,7 +83,7 @@ const Library = () => {
 
   return (
     <Container className="mt-4">
-      <h2 className="text-center mb-4">Your Library</h2>
+      <h2 className="text-center mb-4">Library</h2>
       <Row>
         <Col md={6}>
           <h4>Artists</h4>

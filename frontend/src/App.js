@@ -25,8 +25,8 @@ const App = () => {
           <Navbar.Toggle aria-controls="navbar-nav" />
           <Navbar.Collapse id="navbar-nav">
             <Nav className="me-auto">
-              <Nav.Link as={Link} to="/metadata">
-                Metadata Manager
+              <Nav.Link as={Link} to="/add">
+                Add Records
               </Nav.Link>
               <Nav.Link as={Link} to="/library">
                 Library
@@ -40,7 +40,7 @@ const App = () => {
       <Container className="mt-4">
         <Routes>
           <Route path="/" element={<ImageUploader key={uploaderKey} />} />
-          <Route path="/metadata" element={<MetadataManager />} />
+          <Route path="/add" element={<MetadataManager />} />
           <Route path="/library" element={<Library />} />
           <Route path="/500" element={<ServerError />} />
           <Route path="*" element={<NotFound />} /> {/* Catch-all route */}
