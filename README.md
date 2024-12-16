@@ -179,6 +179,16 @@ docker exec vinyl-nginx nginx -s reload
 
 ## TODO
 
+### Immediate
+
+- Add Records endpoint
+  - Interface for selecting just one DB
+  - Resolve
+- Add metadata to init data
+- If falling back, (no corners detected), try matching with just background removed
+
+### Long-term
+
 - Batch detection? Instance segmentation.
 - Show artist images on library page.
 - On-the-fly (live) classification.
