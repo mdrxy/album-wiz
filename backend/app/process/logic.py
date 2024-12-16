@@ -2,15 +2,12 @@
 Business logic for the matching process.
 """
 
-import io
+from torch import no_grad
 from fastapi import File, UploadFile, HTTPException
-from PIL import Image
-import numpy as np
-from app import normalize
-from app.process.utils import validate_image
+from app.process.utils import validate_image, transform_image
 
 
-async def extract_album_cover(image: UploadFile):
+async def extract_album_cover(image: UploadFile = File(...)) -> bytes:
     """
     Extracts the album cover from an image file.
 
@@ -33,36 +30,29 @@ async def extract_album_cover(image: UploadFile):
     return await image.read()
 
 
-async def vectorize_image(image: UploadFile = File(...)):
+async def vectorize_image(image: bytes, model, img_transform) -> list:
     """
-    Vectorizes the image file.
+    Given an image file, vectorizes it using a pre-trained model (following the specified transformation).
 
-    From a PIL Image object, extract a vector representation of the image.
-
-    Args:
-    - image (UploadFile): The image file to vectorize.
+    Parameters:
+    - image (bytes): The image file to vectorize.
+    - model: The pre-trained model to use for vectorization.
+    - img_transform: The image transformation to apply before vectorization.
 
     Returns:
-    - list: A list of floats representing the image vector.
-
-    Raises:
-    - HTTPException: If the image file is not valid.
+    - list: The vectorized image representation.
     """
-    # Validate the image file
-    await validate_image(image)
+    tensor_image = transform_image(image, img_transform)
+    # Ensure the tensor is on the same device as the model
+    tensor_image = tensor_image.to(next(model.parameters()).device)
 
-    try:
-        contents = await image.read()
-        image = Image.open(io.BytesIO(contents))
-        square_image = normalize.crop_to_square(image)
-        pixels = np.array(square_image)
-        vector = pixels[:3, :, 1].flatten()
+    # Perform vectorization
+    with no_grad():  # Disable gradient computation for inference
+        vector = (
+            model(tensor_image).squeeze(0).cpu().numpy()
+        )  # Flatten the tensor to 1D
 
-        return vector.tolist()
-    except HTTPException as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    return vector.tolist()  # Convert to a flat Python list
 
 
 async def match_vector(image_vector):

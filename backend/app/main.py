@@ -7,45 +7,48 @@ Each route has /api as a prefix, so the full path to the route is /api/{route}.
 """
 
 import os
-import io
 import logging
 from typing import AsyncGenerator, Optional
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
-import asyncpg
-from PIL import Image
 from fastapi.staticfiles import StaticFiles
+import asyncpg
 import torch
+from torchvision import transforms
+from pgvector.asyncpg import register_vector
 
-from app import normalize
 from app.metadata_orchestrator import MetadataOrchestrator
 from app.import_albums import import_albums
-from app.process.utils import validate_image, get_image
+from app.process.utils import validate_image, get_image, uploadfile_to_bytes
 from app.process.logic import extract_album_cover, vectorize_image, match_vector
 
 
 # Configure logging
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.info("Initializing backend")
 
+# Torch setup
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 EMBEDDING_SIZE = 256
-model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
+model = torch.hub.load("pytorch/vision:v0.10.0", "resnet18", weights=None)
 num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, EMBEDDING_SIZE)
-model.load_state_dict(torch.load('tuned.pth'))
+model.load_state_dict(torch.load("tuned.pth", map_location=device))
+model.to(device)
 model.eval()
 
-img_transform = torch.nn.Sequential(
-    torch.nn.functional.to_tensor(),
-    torch.nn.functional.resize((224, 224)),
-    torch.nn.functional.normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+img_transform = transforms.Compose(
+    [
+        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),  # Random crop
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
 )
 
-
-# Config database connection
-
+load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")  # From docker-compose.yml
 MEDIA_DIR = os.getenv("MEDIA_DIR")  # /media
 
@@ -61,17 +64,18 @@ async def lifespan(application: FastAPI) -> AsyncGenerator:
     the pool when the application stops.
     """
     # Create the connection pool using DATABASE_URL
-    application.state.pool = await asyncpg.create_pool(DATABASE_URL)
+    pool = await asyncpg.create_pool(DATABASE_URL, init=register_vector)
+    application.state.pool = pool
     yield  # Yield control to the application
     await application.state.pool.close()
 
 
 # Initialize FastAPI application
 app = FastAPI(lifespan=lifespan)
-
 router = APIRouter()
 orchestrator = MetadataOrchestrator()
 
+# Used to get album covers
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
@@ -94,30 +98,36 @@ async def upload_image(image: UploadFile = File(...)):
     Returns:
     - JSON with the matched album or an error message.
     """
-    # if not image.filename.endswith((".jpg", ".jpeg", ".png")):
-    #     raise HTTPException(
-    #         status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
-    #     )
+    if not image.filename.endswith((".jpg", ".jpeg", ".png")):
+        raise HTTPException(
+            status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
+        )
 
-    # # Step 1: Validate the uploaded image
-    # if not await validate_image(image):
-    #     raise HTTPException(status_code=400, detail="Invalid image file.")
+    # Step 1: Validate the uploaded image (UploadFile)
+    if not await validate_image(image):
+        raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    # # Step 2: Extract the album cover from the image
+    # # Step 2: Extract the album cover from the image (UploadFile -> bytes)
     # album_cover = await extract_album_cover(image)
     # if not album_cover:
     #     raise HTTPException(status_code=400, detail="No album cover found in the image")
 
-    # # Step 3: Vectorize the extracted album cover
-    # image_vector = await vectorize_image(album_cover)
-    # if not image_vector:
-    #     raise HTTPException(status_code=500, detail="Failed to vectorize the image")
+    album_cover = uploadfile_to_bytes(image)
+    # Step 3: Vectorize the extracted album cover (bytes -> list)
+    image_vector = await vectorize_image(album_cover, model, img_transform)
+    if not image_vector:
+        raise HTTPException(status_code=500, detail="Failed to vectorize the image")
+    if len(image_vector) != EMBEDDING_SIZE:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid vector length, expected {EMBEDDING_SIZE}"
+        )
 
     # # Step 4: Query the database for the most similar records
     # matched_records = await match_vector(image_vector)
+    logger.debug("Image vector: %s", image_vector)
 
-    # # Step 5: Return the album metadata
-    # # return matched_album
+    # Step 5: Return the album metadata
+    # return matched_album
 
     return {
         "artist_name": "Radiohead",
@@ -172,9 +182,6 @@ async def upload_album(data: dict):
     - tracks (list): List of track metadata dictionaries.
     - artist_url (str): URL to the artist's page.
     - album_url (str): URL to the album
-
-    Returns:
-    - A success message if the metadata is stored successfully.
     """
     async with app.state.pool.acquire() as connection:
         try:
@@ -221,6 +228,26 @@ async def upload_album(data: dict):
                     track["duration"],
                     track["explicit"],
                 )
+
+            # Vectorize the album cover
+            album_cover = await get_image(data["album_image"])
+
+            # Validate the image
+            await validate_image(album_cover)
+
+            img_bytes = await uploadfile_to_bytes(album_cover)
+            image_vector = await vectorize_image(img_bytes, model, img_transform)
+            if not image_vector:
+                raise HTTPException(
+                    status_code=500, detail="Failed to vectorize the album cover."
+                )
+
+            # Update the album with the vectorized image
+            await connection.execute(
+                "UPDATE albums SET embedding = $1 WHERE id = $2;",
+                image_vector,
+                album_id,
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -291,7 +318,9 @@ async def upload_csv(file: UploadFile = File(...)):
         # Delete the temporary file after use
         os.remove(temp_file_path)
 
-        return {"message": "Albums imported successfully."}
+        # Vectorize the album covers
+        await vectorize_albums()
+        return {"message": "Albums imported successfully and covers vectorized."}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to import albums: {str(e)}"
@@ -309,6 +338,7 @@ async def vectorize_albums():
             sql_query = "SELECT * FROM albums WHERE embedding IS NULL;"
             rows = await connection.fetch(sql_query)
             logger.debug("Fetched %d albums to vectorize.", len(rows))
+
             for row in rows:
                 album_id = row["id"]
                 image_path = row["cover_image"]
@@ -316,23 +346,48 @@ async def vectorize_albums():
                     "Processing album ID %d with image path %s.", album_id, image_path
                 )
 
-                image = await get_image(image_path)
-                logger.debug("Image retrieved successfully for album ID %d.", album_id)
-                image_vector = await vectorize_image(image)
-                if image_vector:
+                image = await get_image(image_path)  # UploadFile
+                if not image:
+                    logger.error("Failed to retrieve image for album ID %d.", album_id)
+                    continue  # Skip this album and process the next one
+
+                try:
+                    await validate_image(image)
                     logger.debug(
-                        "Vectorized image successfully for album ID. Size: %s, ID: %d.",
-                        len(image_vector),
-                        album_id,
+                        "Image retrieved successfully for album ID %d.", album_id
                     )
 
-                    # TODO: get the encoding and use here
+                    img_bytes = await uploadfile_to_bytes(image)
+                    image_vector = await vectorize_image(
+                        img_bytes, model, img_transform
+                    )
 
+                    if not isinstance(image_vector, list) or not all(
+                        isinstance(x, (float, int)) for x in image_vector
+                    ):
+                        raise ValueError(
+                            f"Invalid vector format for album ID {album_id}: {image_vector}"
+                        )
+
+                    # Log the vector for debugging
+                    logger.debug(
+                        "Flattened vector for album ID %d: %s", album_id, image_vector
+                    )
+
+                    # Update the database
                     sql_query = "UPDATE albums SET embedding = $1 WHERE id = $2;"
                     await connection.execute(sql_query, image_vector, album_id)
                     logger.debug(
                         "Vector updated successfully for album ID %d.", album_id
                     )
+                except (ValueError, TypeError) as vectorization_error:
+                    logger.error(
+                        "Error processing album ID %d: %s",
+                        album_id,
+                        str(vectorization_error),
+                    )
+                    continue  # Log the error and proceed with the next album
+
             return {"message": "Albums vectorized successfully."}
     except Exception as e:
         logger.error("Error during vectorization: %s", str(e))
@@ -357,25 +412,24 @@ async def get_table_data(table_name: str):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/db/resolve")
-async def upload_resolution(data: dict):
-    """
-    Accept resolved metadata and store it in the database.
-    """
-    # TODO
+# @router.post("/db/resolve")
+# async def upload_resolution(data: dict):
+#     """
+#     Accept resolved metadata and store it in the database.
+#     """
 
-    # try:
-    #     async with app.state.pool.acquire() as connection:
-    #         sql_query = """
-    #             INSERT INTO resolved_metadata (search_query, resolution)
-    #             VALUES ($1, $2)
-    #             ON CONFLICT (search_query) DO UPDATE
-    #             SET resolution = EXCLUDED.resolution
-    #         """
-    #         await connection.execute(sql_query, data["query"], data["resolution"])
-    #     return {"message": "Resolution uploaded successfully."}
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=str(e)) from e
+#     try:
+#         async with app.state.pool.acquire() as connection:
+#             sql_query = """
+#                 INSERT INTO resolved_metadata (search_query, resolution)
+#                 VALUES ($1, $2)
+#                 ON CONFLICT (search_query) DO UPDATE
+#                 SET resolution = EXCLUDED.resolution
+#             """
+#             await connection.execute(sql_query, data["query"], data["resolution"])
+#         return {"message": "Resolution uploaded successfully."}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 def hashify(value):
@@ -561,70 +615,5 @@ async def get_sources():
     return {"sources": sources}
 
 
-@router.post("/query")
-async def vectorize(file: UploadFile = File(...)):
-    """
-    Endpoint to receive an image file and convert it to a PIL image.
-    """
-    logger.debug("Received file: %s", file)
-    try:
-        contents = await file.read()
-        logger.debug("File contents read successfully.")
-
-        image = Image.open(io.BytesIO(contents))
-        logger.debug("Image opened successfully.")
-
-        square_image = normalize.crop_to_square(image)
-        logger.debug("Image cropped to square successfully.")
-        tensor_image = img_transform(square_image)
-        vector = model(tensor_image).detach().numpy()
-        logger.debug("Image vectorized successfully.")
-
-        logger.debug("Vector: %s", vector)
-
-        return {"message": "Image successfully converted", "vector": vector}
-    except HTTPException as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-@router.get("/album")
-async def get_album(vector: List[float] = Query(...)):
-    """
-    Endpoint to receive a vector and return the most similar album.
-    """
-    logger.debug("Received vector: %s", vector)
-    # Check if the vector is valid
-    logger.warning("Vector length: %s, this API is not useable yet.", len(vector))
-    if len(vector) != EMBEDDING_SIZE:
-        raise HTTPException(status_code=400, detail=f"Invalid vector length, expected {EMBEDDING_SIZE}")
-    try:
-        #TODO: Implement the query.get_album function
-        album = query.get_album(vector)
-        return {"message": "Album found", "album": album}
-    except HTTPException as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-@router.post("/vectorize")
-async def vectorize(file: UploadFile = File(...)):
-    """
-    endpoint that receives an image file and returns the vector representation 
-    of the image. 
-    
-    Ensure that the image is a square image before passing it to the model.
-    """
-    try: 
-        contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
-        square_image = normalize.crop_to_square(image)
-        tensor_image = img_transform(square_image)
-        vector = model(tensor_image).detach().numpy()
-        return {"message": "Image successfully converted", "vector": vector.tolist()}
-    except HTTPException as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
+# Prefix all routes with /api
 app.include_router(router, prefix="/api")
