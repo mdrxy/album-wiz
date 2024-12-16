@@ -98,19 +98,6 @@ services:
     networks:
       - vinyl-network
 
-  vector-search:
-    build:
-      context: ./vector-search
-    container_name: vinyl-vector-search
-    environment:
-      - DATABASE_URL
-    env_file:
-      - .env
-    depends_on:
-      - database # FYI - doesn't guarantee that the database is *ready*
-    networks:
-      - vinyl-network
-
   nginx:
     image: nginx:latest # Use the official Nginx image.
     container_name: vinyl-nginx
