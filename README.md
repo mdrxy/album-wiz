@@ -1,30 +1,16 @@
 # Vinyl Record Recognition System
 
-This project is a companion tool for radio DJs to explore and discover vinyl records from a physical collection. By leveraging computer vision, deep learning, and metadata aggregation, this tool strives to make music exploration easier and more enjoyable.
+This project is a companion tool for radio DJs to help facilitate exploration and discovery with physical collections of vinyl records. By leveraging computer vision, deep learning, and metadata aggregation, this tool aims to reduce the amount of time needed to retrieve relevant information about a given release.
 
 ## Project Structure
 
-The project is containerized with Docker to simplify setup and deployment. The services include:
+The project is containerized with Docker to increase compatibility across platforms and to simplify setup and deployment. The key services include:
 
 - **Frontend**: React app for user interaction.
-- **Backend**: Python (FastAPI) service for image recognition and metadata aggregation.
-- **Database**: PostgreSQL with `pgvector` for vectorized queries. pgAdmin is available for browsing the database in the browser.
+- **Backend**: Python (FastAPI) service for API endpoints, image recognition and metadata aggregation.
+- **Database**: PostgreSQL with `pgvector` for vectorized queries. pgAdmin is available for browsing the database in a web browser.
 - **Cache**: Redis for high-performance data caching.
-- **Vector Search**: Service for latent vector encoding and similarity search.
 - **Nginx**: Reverse proxy for routing traffic between services.
-
-The vector search service is separated into its own service for modularity, scalability, and maintainability:
-
-- Separation keeps the backend lightweight and focused
-- Also, we could theoretically run this on the HPC to allocate more GPU
-
-**Example Vector Search Workflow:**
-
-1. Backend receives an image from the frontend and sends it to the vector search service via an internal API.
-2. Vector search encodes the image, queries the database (or Redis), and returns results to the backend.
-3. Backend combines these results with metadata from other sources (e.g., Spotify, Last.fm) and returns a response to the frontend.
-
----
 
 ## Getting Started
 
@@ -32,13 +18,18 @@ The vector search service is separated into its own service for modularity, scal
 
 Ensure you install the following locally first:
 
+#### For Deployment
+
 - [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)
+
+#### For Development
+
 - [Node.js and npm](https://nodejs.org/en)
 - Python 3.10+
 
 ### Installation
 
-1. Clone the repository:
+1. Clone this repository:
 
    ```bash
    git clone https://github.com/mdrxy/album-wiz.git
@@ -55,16 +46,15 @@ Ensure you install the following locally first:
     Enter values for `DISCOGS_TOKEN`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`.
 
     - Get a Discogs token by making a Discogs account and then [generating a personal access token](discogs.com/settings/developers).
-
     - Get Spotify Client ID and secrets by making an app in their [developer dashboard](https://developer.spotify.com/).
 
-3. Build and start the containers:
+3. Build and start the app:
 
     ```bash
     docker compose up -d --build
     ```
 
-    Note: if you omit `-d`, the app will still launch and logs will be output to your terminal. However, upon pressing `CTRL-C`, the containers will stop. The `-d` flag detaches the containers and runs them in the background.
+    Note: if you omit `-d`, the app will still launch and logs will be output to your terminal. Upon pressing `CTRL-C`, the app will stop. The `-d` flag is used to run the app in the background.
 
     Omit `--build` if there are no container changes needing to be made (e.g. you only changed `backend` or `frontend` code).
 
@@ -75,7 +65,7 @@ Ensure you install the following locally first:
      - User/pass: `admin@vinyl.com`/`admin`
      - PostgreSQL: `postgres`/`postgres`
 
-5. Stop all services:
+5. Stop the app:
 
     ```bash
     docker compose down
@@ -125,7 +115,7 @@ It's also important to note that `-f` attaches the logs to your terminal window 
 
 ### Backend
 
-Changes made in `/backend` are automatically reflected in the running backend service. However, if you need to rebuild the backend service for any reason:
+Changes made in `/backend` are automatically reflected in the running backend service (after detecting a change in any backend file - remember to save!). If you need to rebuild the backend service for any reason:
 
 ```bash
 docker compose up -d --build backend
@@ -166,10 +156,6 @@ To update the Nginx config, make the necessary changes locally and then run:
 docker exec vinyl-nginx nginx -s reload
 ```
 
-## Troubleshooting
-
-WIP
-
 ## Contributing Guidelins
 
 1. Always create feature branches for new work:
@@ -193,4 +179,8 @@ WIP
 
 ## TODO
 
-- Show artist images on library page
+- Batch detection? Instance segmentation.
+- Show artist images on library page.
+- On-the-fly (live) classification.
+- If no classification above a certain threshold is found, return the three closest, and present them to the user. The user chooses the ground truth and the model is updated via reinforcement learning.
+- Add to playlist/queue in streaming apps (Spotify)
