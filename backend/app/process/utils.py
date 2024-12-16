@@ -9,7 +9,7 @@ import logging
 from PIL import Image
 from dotenv import load_dotenv
 from fastapi import HTTPException, UploadFile
-from app.process.image_extractor import crop_to_square
+from app.process.cover_extractor import crop_to_square
 
 load_dotenv()
 MEDIA_DIR = os.getenv("MEDIA_DIR")

@@ -10,7 +10,6 @@ import numpy as np
 import cv2
 from PIL import Image
 from rembg import remove
-import matplotlib.pyplot as plt
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -23,7 +22,7 @@ DEBUGGING_DIR = os.path.abspath("debugging_imgs")
 try:
     os.makedirs(DEBUGGING_DIR, exist_ok=True)
     logger.debug("Debugging directory created or already exists at: %s", DEBUGGING_DIR)
-except Exception as e:
+except OSError as e:
     logger.error("Failed to create debugging directory at %s: %s", DEBUGGING_DIR, e)
 
 # If it does exist, clear out any existing images
@@ -32,7 +31,7 @@ for file in os.listdir(DEBUGGING_DIR):
     try:
         if os.path.isfile(file_path):
             os.unlink(file_path)
-    except Exception as e:
+    except OSError as e:
         logger.error("Failed to delete file %s: %s", file_path, e)
 
 
@@ -230,10 +229,11 @@ def detect_lines(img: np.ndarray) -> List[List[int]]:
     - list: A list of detected lines, each represented as [x1, y1, x2, y2].
     """
     logger.debug("Entering detect_lines")
-    edges = cv2.Canny(img, 50, 150, apertureSize=3)
+    edges = cv2.Canny(img, 40, 150, apertureSize=3)
     save_image(edges, "3-canny_edges.png")
 
-    edges_dilated = cv2.dilate(edges, None)
+    kernel = np.ones((5, 5), np.uint8)
+    edges_dilated = cv2.dilate(edges, kernel, iterations=2)
     save_image(edges_dilated, "4-dilated_edges.png")
 
     lines = cv2.HoughLinesP(
@@ -254,7 +254,9 @@ def detect_lines(img: np.ndarray) -> List[List[int]]:
 
     for line in flattened_lines:
         x1, y1, x2, y2 = line
-        cv2.line(line_img, (x1, y1), (x2, y2), (255, 105, 180), 2)  # Pink color in BGR
+        # Draw lines in pink with increased thickness
+        cv2.line(line_img, (x1, y1), (x2, y2), (255, 105, 180), 15)  # Pink color in BGR
+
     save_image(line_img, "5-detected_lines.png")
 
     logger.debug("Exiting detect_lines")
@@ -404,17 +406,20 @@ def find_corners_from_lines(line_pairs: list, img: np.ndarray) -> list:
                 corners.append(intersection)
                 x1, y1, x2, y2 = line_1
                 x3, y3, x4, y4 = line_2
-                # Draw lines in green instead of white
-                cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0, 255, 0), 2)
-                # Draw intersection point in blue
+
+                # Draw lines in green with increased thickness
+                cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 4)
+                cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0, 255, 0), 4)
+
+                # Draw intersection point with a larger blue circle
                 cv2.circle(
                     img,
                     (int(intersection[0]), int(intersection[1])),
-                    5,
+                    50,  # Radius
                     (255, 0, 0),
                     -1,
                 )
+
     save_image(img, "6-corners_detected.png")
 
     logger.debug("Detected %d corners.", len(corners))
@@ -624,6 +629,15 @@ async def extract_album_cover(image: Image.Image) -> Optional[bytes]:
     - Optional[bytes]: The extracted album cover in bytes or None if extraction fails.
     """
     logger.debug("Entering extract_album_cover")
+
+    # for file in os.listdir(DEBUGGING_DIR):
+    #     file_path = os.path.join(DEBUGGING_DIR, file)
+    #     try:
+    #         if os.path.isfile(file_path):
+    #             os.unlink(file_path)
+    #     except OSError as e:
+    #         logger.error("Failed to delete file %s: %s", file_path, e)
+
     cropped_image = crop_to_square(image)
     if cropped_image is None:
         logger.error("Album cover extraction returned None.")

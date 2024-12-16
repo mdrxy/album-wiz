@@ -6,6 +6,7 @@ This module contains the main FastAPI application and defines the API routes.
 Each route has /api as a prefix, so the full path to the route is /api/{route}.
 """
 
+import io
 import os
 import logging
 import traceback
@@ -22,7 +23,7 @@ from pgvector.asyncpg import register_vector
 from app.metadata_orchestrator import MetadataOrchestrator
 from app.import_albums import import_albums
 from app.process.utils import validate_image, get_image, uploadfile_to_bytes
-from app.process.image_extractor import extract_album_cover
+from app.process.cover_extractor import extract_album_cover
 from app.process.logic import vectorize_image, match_vector
 
 
@@ -103,52 +104,51 @@ async def upload_image(image: UploadFile = File(...)):
     """
     logger.info("Received upload request for file: %s", image.filename)
 
-    # Step 1: Validate the uploaded image (UploadFile)
     if not await validate_image(image):
         raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    # Step 2: Extract the album cover from the image (UploadFile -> bytes)
     try:
-        # Read the image as a PIL Image
+        # Step 1: Extract album cover
         image_pil = Image.open(image.file).convert("RGB")
         album_cover_bytes = await extract_album_cover(image_pil)
+
+        # Step 2: Fallback to entire image if cover extraction fails
         if album_cover_bytes is None:
+            logger.warning("Album cover not extracted. Falling back to full image.")
+            image.file.seek(0)  # Reset file pointer
+            album_cover_bytes = image.file.read()  # Read raw bytes
+            try:
+                # Validate raw bytes with PIL
+                Image.open(io.BytesIO(album_cover_bytes)).verify()
+            except Exception as e:
+                logger.error("Fallback image validation failed: %s", e)
+                raise HTTPException(
+                    status_code=500, detail="Fallback image is invalid or corrupt."
+                ) from e
+
+        # Step 3: Vectorize the image
+        image_vector = await vectorize_image(album_cover_bytes, model, img_transform)
+        if not image_vector or len(image_vector) != EMBEDDING_SIZE:
             raise HTTPException(
-                status_code=400,
-                detail=f"No album cover found in the image with filename {image.filename}.",
+                status_code=500,
+                detail="Failed to vectorize the image or invalid vector size.",
             )
-    except Exception as e:
-        logger.error("Error during album cover extraction: %s", exc_info=e)
-        raise HTTPException(
-            status_code=500, detail="Failed to extract album cover."
-        ) from e
+        logger.debug("Image vector: %s", image_vector)
 
-    # Step 3: Vectorize the extracted album cover (bytes -> list)
-    image_vector = await vectorize_image(album_cover_bytes, model, img_transform)
-    if not image_vector:
-        raise HTTPException(status_code=500, detail="Failed to vectorize the image")
-    if len(image_vector) != EMBEDDING_SIZE:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid vector length, expected {EMBEDDING_SIZE}"
-        )
-    logger.debug("Image vector: %s", image_vector)
-
-    # Step 4: Query the database for the top 3 most similar records
-    # TODO: make `n` a query parameter
-    try:
+        # Step 4: Query the database for similar records
         async with app.state.pool.acquire() as connection:
             matched_records = await match_vector(image_vector, 3, connection)
-    except HTTPException as http_exc:
-        # Re-raise HTTPExceptions from match_vector
-        raise http_exc
-    except Exception as e:
-        logger.error("Unexpected error during similarity search: %s", e)
-        raise HTTPException(
-            status_code=500, detail="An unexpected error occurred."
-        ) from e
 
-    # Step 5: Return the album metadata
-    return matched_records[0] if matched_records else {"message": "No matches found."}
+        return (
+            matched_records[0] if matched_records else {"message": "No matches found."}
+        )
+
+    except Exception as e:
+        logger.error("Error processing image: %s", exc_info=e)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while processing the image.",
+        ) from e
 
 
 @router.post("/album")
