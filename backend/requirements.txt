@@ -15,6 +15,7 @@ musicbrainzngs
 pandas
 torchvision
 pgvector
-opencv-python
+opencv-python-headless
 matplotlib
 rembg
+onnxruntime
