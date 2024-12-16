@@ -10,6 +10,19 @@ const ImageUploader = () => {
   const [responseData, setResponseData] = useState(null); // State for response data
   const [showTracks, setShowTracks] = useState(false); // State for toggling tracks
   const [isDragging, setIsDragging] = useState(false); // State for drag over
+  const [isMobile, setIsMobile] = useState(false); // New state for device type
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    // Simple mobile detection
+    if (
+      /android|iphone|ipad|iPod|opera mini|iemobile|wpdesktop/i.test(
+        userAgent.toLowerCase()
+      )
+    ) {
+      setIsMobile(true);
+    }
+  }, []);
 
   // Helper function to format duration
   const formatDuration = (seconds) => {
@@ -258,41 +271,83 @@ const ImageUploader = () => {
 
       <div className="mb-3">
         {!uploadSuccess && !selectedFile && (
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            className="form-control"
-          />
+          <label
+            htmlFor="fileInput"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              maxWidth: "90%", // Slight padding for mobile
+              margin: "0 auto",
+              padding: "20px", // Increased padding for a taller button
+              backgroundColor: "#007bff",
+              color: "#fff",
+              textAlign: "center",
+              fontSize: "1.2rem",
+              borderRadius: "8px",
+              cursor: "pointer",
+              boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+            }}
+          >
+            <i
+              className="bi bi-camera"
+              style={{
+                fontSize: "5rem", // Larger icon
+                marginBottom: "16px", // Space between icon and text
+              }}
+            ></i>
+            {isMobile ? "Take Photo" : "Choose File"} {/* Dynamic Label */}
+            <input
+              id="fileInput"
+              type="file"
+              accept="image/*"
+              capture={isMobile ? "environment" : undefined} // Optional: Only add capture on mobile
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+          </label>
         )}
       </div>
 
-      {previewUrl && (
-        <div className="mb-3">
-          <img
-            src={previewUrl}
-            alt="Selected preview"
-            style={{
-              maxWidth: "25%",
-              height: "auto",
-              borderRadius: "8px",
-              boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
-            }}
-          />
-        </div>
-      )}
+      <div className="mb-3">
+        {previewUrl && (
+          <div className="mb-3">
+            <img
+              src={previewUrl}
+              alt="Selected preview"
+              style={{
+                maxWidth: "90%", // Take most of the width on mobile
+                height: "auto",
+                borderRadius: "8px",
+                boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+              }}
+            />
+          </div>
+        )}
 
-      {selectedFile && !uploadError && (
-        <button
-          className="btn btn-primary"
-          onClick={handleUpload}
-          disabled={uploading || !selectedFile}
-          style={buttonStyle}
-        >
-          {uploading ? "Uploading..." : "Confirm"}
-        </button>
-      )}
+        {selectedFile && !uploadError && (
+          <div>
+            <button
+              className="btn btn-secondary"
+              onClick={resetUploader}
+              disabled={uploading}
+              style={buttonStyle}
+            >
+              Take Again
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleUpload}
+              disabled={uploading || !selectedFile}
+              style={{ ...buttonStyle, marginLeft: "10px" }}
+            >
+              {uploading ? "Processing..." : "Confirm"}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Feedback Messages */}
       {uploadSuccess && (
@@ -343,7 +398,8 @@ const ImageUploader = () => {
                 src={`/media/${responseData.album_image}`}
                 alt="Album image"
                 style={{
-                  maxWidth: "12.5%",
+                  maxWidth: "90%", // Increased from 12.5% to 90%
+                  height: "auto",
                   borderRadius: "8px",
                   boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
                 }}

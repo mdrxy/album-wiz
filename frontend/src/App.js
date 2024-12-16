@@ -9,26 +9,41 @@ import ServerError from "./components/ServerError";
 
 const App = () => {
   const [uploaderKey, setUploaderKey] = useState(0);
+  const [expanded, setExpanded] = useState(false); // Track navbar expansion state
 
   const handleAlbumWizClick = () => {
-    setUploaderKey(prevKey => prevKey + 1);
+    setUploaderKey((prevKey) => prevKey + 1);
+    setExpanded(false);
+  };
+
+  const handleNavClick = () => {
+    setExpanded(false); // Close navbar on link click
   };
 
   return (
     <div>
       {/* Navbar */}
-      <Navbar bg="dark" variant="dark" expand="lg">
+      <Navbar
+        bg="dark"
+        variant="dark"
+        expand="lg"
+        expanded={expanded} // Control navbar expansion state
+        onToggle={(isExpanded) => setExpanded(isExpanded)} // Sync toggle with state
+      >
         <Container fluid>
           <Navbar.Brand as={Link} to="/" onClick={handleAlbumWizClick}>
-            album-wiz
+            <strong>album-wiz</strong>
           </Navbar.Brand>
           <Navbar.Toggle aria-controls="navbar-nav" />
           <Navbar.Collapse id="navbar-nav">
-            <Nav className="me-auto">
-              <Nav.Link as={Link} to="/add">
+            <Nav className="me-auto" onSelect={handleNavClick}>
+              <Nav.Link as={Link} to="/" onClick={handleAlbumWizClick}>
+                Match Record
+              </Nav.Link>
+              <Nav.Link as={Link} to="/add" onClick={handleNavClick}>
                 Add Records
               </Nav.Link>
-              <Nav.Link as={Link} to="/library">
+              <Nav.Link as={Link} to="/library" onClick={handleNavClick}>
                 Library
               </Nav.Link>
             </Nav>
