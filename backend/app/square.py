@@ -69,21 +69,24 @@ def find_lines_intersection(line_1, line_2):
     else:
         vertical_2 = True
 
-    if vertical_1:
+    if vertical_1 and vertical_2:
+        return None, None
+
+    elif vertical_1:
         x_intersect = x1
         y_intersect = slope_2 * x_intersect + (y3 - slope_2 * x3)
     
     elif vertical_2:
         x_intersect = x3
         y_intersect = slope_1 * x_intersect + (y1 - slope_1 * x1)
-
-    elif vertical_1 and vertical_2:
-        return None, None
     
     else:
         intercept_1 = y1 - slope_1 * x1
         intercept_2 = y3 - slope_2 * x3
-        x_intersect = (intercept_2 - intercept_1) / (slope_1 - slope_2)
+        if slope_1 != slope_2:
+            x_intersect = (intercept_2 - intercept_1) / (slope_1 - slope_2)
+        else:
+            return None, None
         y_intersect = x_intersect * slope_1 + intercept_1
 
 
@@ -150,53 +153,6 @@ def filter_unique_lines(lines, threshold):
     return unique_lines
 
 
-def find_most_parallel_pairs(lines, threshold):
-    line_pairs = []
-    distances = []
-    
-    for line in lines:
-        best_pair = None
-        best_similarity = 0
-        for next_line in lines:
-            if np.array_equal(next_line, line):
-                continue
-            if lines_proximity(next_line, line, threshold):
-                continue
-            similarity = calculate_parallel_similarity(line, next_line)
-            if similarity > best_similarity:
-                best_pair = (line, next_line)
-                best_similarity = similarity
-
-        new_pair = True
-        for pair in line_pairs:
-            best_1, best_2 = best_pair
-            curr_1, curr_2 = pair
-            if (best_1 == curr_1 or best_2 == curr_2) or (best_1 == curr_2 and best_2 == curr_1):
-                new_pair = False
-                break
-        if new_pair:
-            line_pairs.append(best_pair)
-            distances.append(float(best_similarity))
-    
-    sorted_dist_indexes = np.argsort(distances)[::-1]
-
-    sorted_pairs = [line_pairs[i] for i in sorted_dist_indexes]
-
-    best_pairs = [sorted_pairs[0]]
-    
-    i = 1
-    while len(best_pairs) < 2 and i < len(sorted_pairs):
-        curr_pair = sorted_pairs[i]
-        if calculate_parallel_similarity(best_pairs[0][0], curr_pair[0]) < 0.9:
-            best_pairs.append(curr_pair)
-        i += 1
-    
-    if len(best_pairs) < 2:
-        best_pairs.append(sorted_pairs[1])
-    
-    return best_pairs
-
-
 def find_corners_from_lines(line_pairs):
     corners = []
     pair_1 = line_pairs[0]
@@ -217,6 +173,99 @@ def find_corners_from_lines(line_pairs):
 
     return corners
 
+def find_parallel_pairs(lines, threshold):
+    line_pairs = []
+    distances = []
+    
+    for line in lines:
+        best_pair = None
+        best_similarity = 0
+        for next_line in lines:
+            if np.array_equal(next_line, line):
+                continue
+            if lines_proximity(next_line, line, threshold):
+                continue
+            similarity = calculate_parallel_similarity(line, next_line)
+            if similarity > best_similarity:
+                best_pair = (line, next_line)
+                best_similarity = similarity
+
+        new_pair = True
+        for pair in line_pairs:
+            best_1, best_2 = best_pair
+            curr_1, curr_2 = pair
+            if (best_1 == curr_1 and best_2 == curr_2) or (best_1 == curr_2 and best_2 == curr_1):
+                new_pair = False
+                break
+        if new_pair:
+            line_pairs.append(best_pair)
+            distances.append(float(best_similarity))
+    
+    return line_pairs
+
+
+def find_best_corners(lines, threshold, img):
+    pairs = find_parallel_pairs(lines, threshold)
+    all_pairs_of_pairs = []
+    ratio_distances = []
+    sets_of_corners = []
+    
+    for first_pair in pairs:
+        for second_pair in pairs:
+            if (first_pair[0] == second_pair[0] and first_pair[1] == second_pair[1]) or \
+                (first_pair[1] == second_pair[0] and first_pair[0] == second_pair[1]):
+                continue
+            if calculate_parallel_similarity(first_pair[0], second_pair[0]) > 0.9:
+                continue
+            corners = find_corners_from_lines([first_pair, second_pair])
+
+            if corners is None:
+                continue
+
+            reformatted_corners = reformat_corners(corners)
+            if reformatted_corners is None:
+                continue
+
+            sets_of_corners.append(reformatted_corners)
+            (x1, y1), (x2, y2), (x3, y3), (x4, y4) =  reformatted_corners
+
+            width_top = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+            width_bottom = np.sqrt((x4 - x3) ** 2 + (y4 - y3) ** 2)
+            width = (width_top + width_bottom) / 2
+
+            height_left = np.sqrt((x4 - x1) ** 2 + (y4 - y1) ** 2)
+            height_right = np.sqrt((x3 - x2) ** 2 + (y3 - y2) ** 2)
+            height = (height_left + height_right) / 2
+
+            ratio = width / height
+            distance_from_1 = abs(ratio - 1)
+            
+            all_pairs_of_pairs.append([first_pair, second_pair])
+            ratio_distances.append(distance_from_1)
+
+    if len(ratio_distances) == 0:
+        return None
+    
+    sorted_dist_idxs = np.argsort(ratio_distances)
+    best_idx = sorted_dist_idxs[0]
+    # best_pair = all_pairs_of_pairs[best_idx]
+    best_corners = sets_of_corners[best_idx]
+
+    # for pair in best_pair:
+    #     for line in pair:
+    #         x1, y1, x2, y2 = line
+    #         plt.plot([x1, x2], [y1,y2], color='red')
+    # for corner in best_corners:
+    #     x = corner[0]
+    #     y = corner[1]
+    #     plt.plot(x, y, 'bo')
+    # plt.imshow(img)
+    # plt.title("TEST CORNERS")
+    # plt.show()
+
+    return best_corners
+
+
 
 def detect_corners(img):
     height = img.shape[0]
@@ -229,11 +278,9 @@ def detect_corners(img):
 
     if len(unique_lines) < 4:
         print("ERROR: NOT ENOUGH LINES FOUND")
-        return
+        return None
     
-    best_pairs = find_most_parallel_pairs(unique_lines, proximity_threshold)
-
-    corners = find_corners_from_lines(best_pairs)
+    corners = find_best_corners(lines, proximity_threshold, img)
 
     if corners is None:
         return None
@@ -313,7 +360,7 @@ def crop_to_square(image: Image):
     warped_img = perspective_transform(corners, img_arr)
     return warped_img
 
-# path = 'backend/app/test_images/IMG_5415.JPG'
+
 
 total_imgs = 0
 correct_imgs = 0
@@ -325,6 +372,7 @@ for filename in glob.glob("backend/app/working_inputs/*"):
 # for filename in ['backend/app/test_images/IMG_5348-0001.jpg']:
 # for filename in ['backend/app/test_images/IMG_5353-0013.jpg']:
 # for filename in ['backend/app/test_images/IMG_5356-0036.jpg']:
+# for filename in ['backend/app/working_inputs/IMG_5355-0004.jpg']:
     total_imgs += 1
     print("IMAGE: ", filename)
     img = Image.open(filename)
@@ -342,8 +390,10 @@ for filename in glob.glob("backend/app/working_inputs/*"):
     # plt.imshow(bg_removed_img)
     # plt.title("background removed image")
     # plt.show()
+
     corners = detect_corners(bg_removed_img)
-    if corners == None:
+    # corners = detect_corners(bg_removed_img)
+    if corners is None:
         print("Corners out of bounds")
     else:
         warped_img = perspective_transform(corners, img_arr)
@@ -362,3 +412,7 @@ for filename in glob.glob("backend/app/working_inputs/*"):
 print('\n')
 print('Total number of images: ', total_imgs)
 print('Number of correct images: ', correct_imgs)
+
+# img = Image.open('backend/app/test_images/IMG_5352.JPG')
+# bg_removed_img = remove(img)
+# bg_removed_img.save('backend/app/test_outputs/bg_removed.png')
