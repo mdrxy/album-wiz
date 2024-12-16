@@ -5,6 +5,7 @@ Module with common functions to validate image files sent by the user.
 from io import BytesIO
 import io
 import os
+import logging
 from PIL import Image
 from dotenv import load_dotenv
 from fastapi import HTTPException, UploadFile
@@ -13,6 +14,11 @@ from app import normalize
 
 load_dotenv()
 MEDIA_DIR = os.getenv("MEDIA_DIR")
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.info("Initializing utils module")
 
 
 async def validate_image(image: UploadFile):
@@ -30,14 +36,22 @@ async def validate_image(image: UploadFile):
     """
     allowed_extensions = (".jpg", ".jpeg", ".png")
     if not image.filename.lower().endswith(allowed_extensions):
+        logger.warning("Unsupported file extension: %s", image.filename)
         raise HTTPException(
             status_code=400,
             detail=f"Only {', '.join(allowed_extensions)} files are supported.",
         )
 
-    return True
+    # Optional: Add size validation if desired
+    # MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+    # contents = await image.read()
+    # await image.seek(0)
+    # if len(contents) > MAX_SIZE:
+    #     logger.warning(f"File size exceeds limit: {image.filename}")
+    #     raise HTTPException(status_code=413, detail="File too large")
 
-    # Additional validations can be added here (e.g., file size, image integrity, etc.)
+    logger.info("File %s passed validation.", image.filename)
+    return True
 
 
 async def get_image(path: str) -> UploadFile:

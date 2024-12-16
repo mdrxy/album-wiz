@@ -8,6 +8,7 @@ Each route has /api as a prefix, so the full path to the route is /api/{route}.
 
 import os
 import logging
+import traceback
 from typing import AsyncGenerator, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Query
@@ -98,10 +99,7 @@ async def upload_image(image: UploadFile = File(...)):
     Returns:
     - JSON with the matched album or an error message.
     """
-    if not image.filename.endswith((".jpg", ".jpeg", ".png")):
-        raise HTTPException(
-            status_code=400, detail="Only .jpg, .jpeg, and .png files are supported."
-        )
+    logger.info("Received upload request for file: %s", image.filename)
 
     # Step 1: Validate the uploaded image (UploadFile)
     if not await validate_image(image):
@@ -112,7 +110,7 @@ async def upload_image(image: UploadFile = File(...)):
     # if not album_cover:
     #     raise HTTPException(status_code=400, detail="No album cover found in the image")
 
-    album_cover = uploadfile_to_bytes(image)
+    album_cover = await uploadfile_to_bytes(image)  # Necessary for vectorization
     # Step 3: Vectorize the extracted album cover (bytes -> list)
     image_vector = await vectorize_image(album_cover, model, img_transform)
     if not image_vector:
@@ -121,13 +119,24 @@ async def upload_image(image: UploadFile = File(...)):
         raise HTTPException(
             status_code=400, detail=f"Invalid vector length, expected {EMBEDDING_SIZE}"
         )
-
-    # # Step 4: Query the database for the most similar records
-    # matched_records = await match_vector(image_vector)
     logger.debug("Image vector: %s", image_vector)
 
+    # Step 4: Query the database for the top 3 most similar records
+    # TODO: make `n` a query parameter
+    try:
+        async with app.state.pool.acquire() as connection:
+            matched_records = await match_vector(image_vector, 3, connection)
+    except HTTPException as http_exc:
+        # Re-raise HTTPExceptions from match_vector
+        raise http_exc
+    except Exception as e:
+        logger.error("Unexpected error during similarity search: %s", e)
+        raise HTTPException(
+            status_code=500, detail="An unexpected error occurred."
+        ) from e
+
     # Step 5: Return the album metadata
-    # return matched_album
+    return matched_records[0] if matched_records else {"message": "No matches found."}
 
     return {
         "artist_name": "Radiohead",
@@ -200,11 +209,12 @@ async def upload_album(data: dict):
             )
 
             # Insert album
-            album_id = await connection.execute(
+            album_id = await connection.fetchval(
                 """
                 INSERT INTO albums (title, artist_id, image, url, release_date, genres, total_tracks)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT DO NOTHING;
+                ON CONFLICT (title, artist_id) DO NOTHING
+                RETURNING id;
                 """,
                 data["album_name"],
                 artist_id,
@@ -215,13 +225,23 @@ async def upload_album(data: dict):
                 data["total_tracks"],
             )
 
+            # If album already exists, fetch its ID
+            if not album_id:
+                album_id = await connection.fetchval(
+                    """
+                    SELECT id FROM albums WHERE title = $1 AND artist_id = $2;
+                    """,
+                    data["album_name"],
+                    artist_id,
+                )
+
             # Insert tracks
             for track in data["tracks"]:
                 await connection.execute(
                     """
                     INSERT INTO tracks (album_id, title, duration, explicit)
                     VALUES ($1, $2, $3, $4)
-                    ON CONFLICT DO NOTHING;
+                    ON CONFLICT (title, album_id) DO NOTHING;
                     """,
                     album_id,
                     track["name"],
@@ -231,24 +251,41 @@ async def upload_album(data: dict):
 
             # Vectorize the album cover
             album_cover = await get_image(data["album_image"])
-
-            # Validate the image
-            await validate_image(album_cover)
-
-            img_bytes = await uploadfile_to_bytes(album_cover)
-            image_vector = await vectorize_image(img_bytes, model, img_transform)
-            if not image_vector:
+            if not album_cover:
+                logger.error("Failed to retrieve image for album ID %d.", album_id)
                 raise HTTPException(
-                    status_code=500, detail="Failed to vectorize the album cover."
+                    status_code=400, detail="Album image retrieval failed."
                 )
+            try:
+                await validate_image(album_cover)
+                img_bytes = await uploadfile_to_bytes(album_cover)
+                image_vector = await vectorize_image(img_bytes, model, img_transform)
+                if not image_vector:
+                    raise ValueError(
+                        f"Invalid vector format for album ID {album_id}: {image_vector}"
+                    )
 
-            # Update the album with the vectorized image
-            await connection.execute(
-                "UPDATE albums SET embedding = $1 WHERE id = $2;",
-                image_vector,
-                album_id,
-            )
+                if not isinstance(image_vector, list) or not all(
+                    isinstance(x, (float, int)) for x in image_vector
+                ):
+                    raise ValueError(
+                        f"Invalid vector format for album ID {album_id}: {image_vector}"
+                    )
+
+                # Update the database
+                sql_query = "UPDATE albums SET embedding = $1 WHERE id = $2;"
+                await connection.execute(sql_query, image_vector, album_id)
+            except (ValueError, TypeError) as vectorization_error:
+                logger.error(
+                    "Error processing album ID %d: %s",
+                    album_id,
+                    str(vectorization_error),
+                )
+                raise HTTPException(
+                    status_code=500, detail="Vectorization failed."
+                ) from vectorization_error
         except Exception as e:
+            logger.error("Error uploading album: %s", traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -288,6 +325,7 @@ async def delete_album(album_id: int):
             }
 
         except Exception as e:
+            logger.error("Error deleting album: %s", traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -322,6 +360,7 @@ async def upload_csv(file: UploadFile = File(...)):
         await vectorize_albums()
         return {"message": "Albums imported successfully and covers vectorized."}
     except Exception as e:
+        logger.error("Error uploading CSV: %s", traceback.format_exc())
         raise HTTPException(
             status_code=500, detail=f"Failed to import albums: {str(e)}"
         ) from e
@@ -397,18 +436,55 @@ async def vectorize_albums():
 @router.get("/db/{table_name}")
 async def get_table_data(table_name: str):
     """
-    Retrieve all data from the specified table in the database.
+    Retrieve all data from the specified table in the database, excluding non-serializable fields like 'embedding'.
     """
-    sql_query = f"SELECT * FROM {table_name};"
+    ALLOWED_TABLES = {"artists", "albums", "tracks"}
+
+    if table_name not in ALLOWED_TABLES:
+        raise HTTPException(status_code=400, detail="Invalid table name.")
+
+    # Define fields to exclude per table
+    EXCLUDED_FIELDS = {
+        "albums": {"embedding"},
+        # Add other tables and their excluded fields here if needed
+    }
+
     try:
         async with app.state.pool.acquire() as connection:
+            # Retrieve column names for the specified table
+            columns = await connection.fetch(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = $1;
+                """,
+                table_name,
+            )
+
+            # Extract column names into a list
+            column_names = [record["column_name"] for record in columns]
+
+            # Determine which fields to include by excluding the specified ones
+            excluded = EXCLUDED_FIELDS.get(table_name, set())
+            included_columns = [col for col in column_names if col not in excluded]
+
+            # Construct the SQL query with only the included columns
+            columns_str = ", ".join(included_columns)
+            sql_query = f"SELECT {columns_str} FROM {table_name};"
+
+            # Execute the query
             rows = await connection.fetch(sql_query)
+
+            # Convert rows to list of dictionaries
             data = [dict(row) for row in rows]
+
             return data
+
     except Exception as e:
         if "does not exist" in str(e).lower():
             logger.debug("Table %s does not exist.", table_name)
             return {"message": f"The table `{table_name}` does not exist."}
+        logger.error("Error fetching table data: %s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -603,6 +679,7 @@ async def get_metadata(
         return {"query": search_query, "sources": sources, "metadata": metadata}
 
     except Exception as e:
+        logger.error("Error fetching metadata: %s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
