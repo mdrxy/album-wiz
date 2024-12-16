@@ -31,6 +31,7 @@ services:
       - ./backend:/app
       - ./database/sample_data/images:/media
       - ./database/sample_data/import.csv:/app/import.csv
+      - ./debugging_imgs:/app/debugging_imgs
     environment:
       - DATABASE_URL
       - REDIS_URL

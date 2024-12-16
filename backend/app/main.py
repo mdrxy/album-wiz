@@ -16,12 +16,14 @@ from fastapi.staticfiles import StaticFiles
 import asyncpg
 import torch
 from torchvision import transforms
+from PIL import Image
 from pgvector.asyncpg import register_vector
 
 from app.metadata_orchestrator import MetadataOrchestrator
 from app.import_albums import import_albums
 from app.process.utils import validate_image, get_image, uploadfile_to_bytes
-from app.process.logic import extract_album_cover, vectorize_image, match_vector
+from app.process.image_extractor import extract_album_cover
+from app.process.logic import vectorize_image, match_vector
 
 
 # Configure logging
@@ -33,7 +35,7 @@ logger.info("Initializing backend")
 # Torch setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-EMBEDDING_SIZE = 256
+EMBEDDING_SIZE = 256  # TODO: put this in .env
 model = torch.hub.load("pytorch/vision:v0.10.0", "resnet18", weights=None)
 num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, EMBEDDING_SIZE)
@@ -94,7 +96,7 @@ async def upload_image(image: UploadFile = File(...)):
     Endpoint to receive an image file from the homepage.
 
     Args:
-    - file (UploadFile): The image file to save.
+    - image (UploadFile): The image file to save.
 
     Returns:
     - JSON with the matched album or an error message.
@@ -105,14 +107,24 @@ async def upload_image(image: UploadFile = File(...)):
     if not await validate_image(image):
         raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    # # Step 2: Extract the album cover from the image (UploadFile -> bytes)
-    # album_cover = await extract_album_cover(image)
-    # if not album_cover:
-    #     raise HTTPException(status_code=400, detail="No album cover found in the image")
+    # Step 2: Extract the album cover from the image (UploadFile -> bytes)
+    try:
+        # Read the image as a PIL Image
+        image_pil = Image.open(image.file).convert("RGB")
+        album_cover_bytes = await extract_album_cover(image_pil)
+        if album_cover_bytes is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No album cover found in the image with filename {image.filename}.",
+            )
+    except Exception as e:
+        logger.error("Error during album cover extraction: %s", exc_info=e)
+        raise HTTPException(
+            status_code=500, detail="Failed to extract album cover."
+        ) from e
 
-    album_cover = await uploadfile_to_bytes(image)  # Necessary for vectorization
     # Step 3: Vectorize the extracted album cover (bytes -> list)
-    image_vector = await vectorize_image(album_cover, model, img_transform)
+    image_vector = await vectorize_image(album_cover_bytes, model, img_transform)
     if not image_vector:
         raise HTTPException(status_code=500, detail="Failed to vectorize the image")
     if len(image_vector) != EMBEDDING_SIZE:
@@ -137,39 +149,6 @@ async def upload_image(image: UploadFile = File(...)):
 
     # Step 5: Return the album metadata
     return matched_records[0] if matched_records else {"message": "No matches found."}
-
-    return {
-        "artist_name": "Radiohead",
-        "album_name": "OK Computer",
-        "genres": [
-            "Alternative Rock",
-            "Art Rock",
-            "Progressive Rock",
-            "Electronic",
-            "Experimental",
-        ],
-        "artist_image": "https://i.scdn.co/image/ab6761610000e5eba03696716c9ee605006047fd",
-        "album_image": "https://static.independent.co.uk/s3fs-public/thumbnails/image/2017/05/10/11/ok-computer.png",
-        "release_date": "1997-05",
-        "total_tracks": 12,
-        "total_duration": 3230,
-        "tracks": [
-            {"name": "Airbag", "duration": 295, "explicit": True},
-            {"name": "Paranoid Android", "duration": 386, "explicit": None},
-            {"name": "Subterranean Homesick Alien", "duration": 269, "explicit": False},
-            {"name": "Exit Music (For a Film)", "duration": 270, "explicit": False},
-            {"name": "Let Down", "duration": 295, "explicit": False},
-            {"name": "Karma Police", "duration": 258, "explicit": False},
-            {"name": "Fitter Happier", "duration": 90, "explicit": False},
-            {"name": "Electioneering", "duration": 270, "explicit": False},
-            {"name": "Climbing Up the Walls", "duration": 297, "explicit": False},
-            {"name": "No Surprises", "duration": 228, "explicit": False},
-            {"name": "Lucky", "duration": 303, "explicit": None},
-            {"name": "The Tourist", "duration": 269, "explicit": True},
-        ],
-        "artist_url": "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
-        "album_url": "https://open.spotify.com/album/2fGCAYUMssLKiUAoNdxGLx",
-    }
 
 
 @router.post("/album")
@@ -438,13 +417,13 @@ async def get_table_data(table_name: str):
     """
     Retrieve all data from the specified table in the database, excluding non-serializable fields like 'embedding'.
     """
-    ALLOWED_TABLES = {"artists", "albums", "tracks"}
+    allowed_tables = {"artists", "albums", "tracks"}
 
-    if table_name not in ALLOWED_TABLES:
+    if table_name not in allowed_tables:
         raise HTTPException(status_code=400, detail="Invalid table name.")
 
     # Define fields to exclude per table
-    EXCLUDED_FIELDS = {
+    excluded_fields = {
         "albums": {"embedding"},
         # Add other tables and their excluded fields here if needed
     }
@@ -465,7 +444,7 @@ async def get_table_data(table_name: str):
             column_names = [record["column_name"] for record in columns]
 
             # Determine which fields to include by excluding the specified ones
-            excluded = EXCLUDED_FIELDS.get(table_name, set())
+            excluded = excluded_fields.get(table_name, set())
             included_columns = [col for col in column_names if col not in excluded]
 
             # Construct the SQL query with only the included columns
@@ -592,6 +571,7 @@ async def get_metadata(
         If None, collect from all sources.
     - compare (bool, optional): If True and multiple sources are queried, highlight differences
         between sources.
+    - include_all (bool, optional): If True, include all fields in the comparison.
 
     Returns:
     - dict: Metadata from the specified source(s), or a comparison highlighting differences

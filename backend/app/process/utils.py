@@ -9,8 +9,7 @@ import logging
 from PIL import Image
 from dotenv import load_dotenv
 from fastapi import HTTPException, UploadFile
-
-from app import normalize
+from app.process.image_extractor import crop_to_square
 
 load_dotenv()
 MEDIA_DIR = os.getenv("MEDIA_DIR")
@@ -92,10 +91,8 @@ def transform_image(image: bytes, img_transform):
     """
     # Load the image from bytes
     image = Image.open(io.BytesIO(image)).convert("RGB")  # Ensure 3-channel RGB
-    # Preprocess the image (e.g., cropping to square)
-    square_image = normalize.crop_to_square(image)
     # Apply the transformations
-    tensor_image = img_transform(square_image)
+    tensor_image = img_transform(image)
     # Add a batch dimension
     tensor_image = tensor_image.unsqueeze(0)  # Shape: [1, C, H, W]
     return tensor_image

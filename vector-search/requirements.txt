@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-pandas
-numpy
-scipy
-torch
-pgvector
-sqlalchemy
-python-dotenv
