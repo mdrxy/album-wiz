@@ -5,7 +5,7 @@
         "Group": "Servers",
         "Host": "vinyl-database",
         "Port": 5432,
-        "Username": "admin",
+        "Username": "postgres",
         "Password": "postgres",
         "SSLMode": "prefer",
         "MaintenanceDB": "vinyl_db"

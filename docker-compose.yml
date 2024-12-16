@@ -3,92 +3,100 @@ services:
     build:
       context: ./frontend # The local path to the frontend source code
     container_name: vinyl-frontend
-    ports:
-      - "3000:80" # Map port 3000 on the host to port 3000 in the container
     volumes:
-      - ./frontend:/app # Mounts the local frontend directory into the container for development (real-time changes)
+      - ./frontend:/app # Mounts the entire local frontend directory as `/app` in the container
+      - /app/node_modules # Prevents the node_modules directory from being overridden by the container
+        # (avoid conflicts between the dependencies installed on the host machine and those installed inside the container)
+      - ./database/sample_data/images:/app/media # Shared volume for album art and other media files
     environment:
       # Variables that can be accessed in the frontend application
-      - REACT_APP_API_BASE_URL=http://backend:8000 # Base URL for the backend API
-      - CHOKIDAR_USEPOLLING=true # File change detection for quick reloads in development
+      - REACT_APP_API_BASE_URL # `/api`
+      - CHOKIDAR_INTERVAL=100
+      - CHOKIDAR_USEPOLLING # File change detection for reload
+      - WDS_SOCKET_PORT=0 # Use the default Webpack Dev Server socket port (needed for hot reloading)
+    env_file:
+      - .env # `environment` pulls from this file in the root directory of this folder
+    depends_on:
+      - backend # Only startup after the backend service is up
     networks:
       - vinyl-network # Putting all services in the same network for inter-container communication
 
+  # Local backend changes are automatically reflected in the container upon saving
+  # (Exception: changes to the Dockerfile require a rebuild)
   backend:
     build:
       context: ./backend
     container_name: vinyl-backend
-    ports:
-      - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./database/sample_data/images:/media
+      - ./database/sample_data/import.csv:/app/import.csv
     environment:
-      - DATABASE_URL=postgres://admin:postgres@database:5432/vinyl_db # Database connection string
-      - REDIS_URL=redis://cache:6379 # Redis cache connection string
-    networks:
-      - vinyl-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - DATABASE_URL
+      - REDIS_URL
+      - MEDIA_DIR
+    env_file:
+      - .env
     depends_on:
-      - database # Ensure the database container starts before the backend
-      - cache # Ensure the Redis cache container starts before the backend
-
-  database:
-    build:
-        context: ./database
-    container_name: vinyl-database
-    ports:
-      - "5432:5432" # (Postgres default)
-    volumes:
-      - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with a custom SQL script
-    environment:
-      - POSTGRES_USER=admin # Default database user
-      - POSTGRES_PASSWORD=postgres # Default password for the user
-      - POSTGRES_DB=vinyl_db # Database name
+      database:
+        # Ensure the database container starts before the backend
+        condition: service_healthy
+      cache:
+        condition: service_healthy # Ensure the Redis cache container starts before the backend
     networks:
       - vinyl-network
-    
+
+  # If renaming this service, update DATABASE_URL in the .env file!
+  database:
+    image: postgres:15
+    container_name: vinyl-database
+    build:
+      context: ./database # Tell Docker to build the database service from the Dockerfile in the database directory
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persistent storage for the database data (allows data to outlive container restarts/builds)
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql # Initialize the database with our custom SQL init script
+      - ./database/sample_data/images:/media
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vinyl_db
+    env_file:
+      - .env
+    networks:
+      - vinyl-network
+
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: vinyl-pgadmin
-    ports:
-      - "5050:80" # Map port 5050 on the host to port 80 in the pgAdmin container
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@vinyl.com # Default pgAdmin login email
-      - PGADMIN_DEFAULT_PASSWORD=admin # Default pgAdmin login password
+    container_name: pgadmin
+    env_file:
+      - .env
     volumes:
-    - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
     depends_on:
-      - database # Ensure the database container starts before pgAdmin
+      database:
+        # Ensure the database container starts before pgAdmin
+        condition: service_healthy
     networks:
       - vinyl-network
 
+  # If renaming this service, update REDIS_URL in the .env file
   cache:
     image: redis:7
     container_name: vinyl-cache
-    ports:
-      - "6379:6379" # (Redis default)
-    networks:
-      - vinyl-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - redis_data:/data
-
-  vector-search:
-    build:
-      context: ./vector-search
-    container_name: vinyl-vector-search
-    ports:
-      - "8001:8001"
-    environment:
-    - DATABASE_URL=postgres://postgres:postgres@database:5432/vinyl_db
     networks:
       - vinyl-network
-    depends_on:
-      - database # FYI - doesn't guarantee that the database is ready
 
   nginx:
     image: nginx:latest # Use the official Nginx image.
@@ -96,19 +104,22 @@ services:
     ports:
       - "80:80" # Default (http) web port
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # Bind mount the config file.
-      # 'ro' ensures read-only access meaning the container can't modify the file on the host
-    networks:
-      - vinyl-network
+      - ./frontend/build:/usr/share/nginx/html:ro # Mount the built folder of the frontend app
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # Bind mount the config file. 'ro' ensures read-only access meaning the container can't modify the file on the host
+      - ./nginx/favicon.ico:/etc/nginx/favicon.ico:ro # Bind mount the favicon
+      - ./database/sample_data/images:/media:ro
     depends_on:
       - frontend
       - backend
+      - database
+      - cache
+    networks:
+      - vinyl-network
 
 volumes:
   postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
-  redis_data: # Define a persistent volume for the Redis cache
+  redis_data: # Persistent volume for the Redis cache
 
 networks:
   vinyl-network:
     # Define a custom network for inter-container communication
-    driver: bridge # Use the bridge network driver for isolation
