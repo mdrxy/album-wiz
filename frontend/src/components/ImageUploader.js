@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "../axiosConfig"; // Import the configured axios instance
 
 const ImageUploader = () => {
@@ -7,14 +7,14 @@ const ImageUploader = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(null);
   const [uploadError, setUploadError] = useState(null);
-  const [responseData, setResponseData] = useState(null); // New state for response data
+  const [responseData, setResponseData] = useState(null); // State for response data
   const [showTracks, setShowTracks] = useState(false); // State for toggling tracks
+  const [isDragging, setIsDragging] = useState(false); // State for drag over
 
   // Helper function to format duration
   const formatDuration = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    // return `${minutes}m ${remainingSeconds}s`;
     return `${minutes} minutes`;
   };
 
@@ -42,9 +42,16 @@ const ImageUploader = () => {
     total_tracks: "# Tracks",
     duration: "Duration",
     tracks: "Tracks",
+    similarity: "Confidence",
   };
 
-  const doNotShow = ["artist_url", "album_url", "artist_image", "album_image", "total_duration"];
+  const doNotShow = [
+    "artist_url",
+    "album_url",
+    "artist_image",
+    "album_image",
+    "total_duration",
+  ];
 
   const formatValue = (key, value) => {
     if (key === "genres" && Array.isArray(value)) {
@@ -53,7 +60,7 @@ const ImageUploader = () => {
     if (key === "release_date" && typeof value === "string") {
       // Transform 'YYYY-MM' to 'Month YYYY'
       const [year, month] = value.split("-");
-      return `${monthNames[month]} ${year}`;
+      return `${monthNames[month] || month} ${year}`;
     }
     if (key === "total_duration") {
       return formatDuration(value);
@@ -69,24 +76,35 @@ const ImageUploader = () => {
     return value;
   };
 
-  // Handle file selection
+  // Handle file selection via input
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    setSelectedFile(file);
-    setUploadSuccess(null);
-    setUploadError(null);
-
     if (file) {
+      processFile(file);
+    }
+  };
+
+  // Process the selected or dropped file
+  const processFile = (file) => {
+    try {
+      if (!file.type.startsWith("image/")) {
+        alert("Please upload a valid image file.");
+        return;
+      }
+
+      setSelectedFile(file);
+      setUploadSuccess(null);
+      setUploadError(null);
+
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
-    } else {
-      setPreviewUrl(null);
+    } catch (error) {
+      console.error("Error in processFile:", error);
+      setUploadError("Failed to process the selected file.");
     }
   };
 
   // Handle image upload using axios
-  // Also handle if the upload is not successful to prompt the user to try again
-
   const handleUpload = async () => {
     if (!selectedFile) {
       alert("Please select an image to upload.");
@@ -115,11 +133,75 @@ const ImageUploader = () => {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      setUploadError(true); // Set the uploadError state to trigger retry dialog
+      setUploadError("Failed to upload image. Please try again.");
     } finally {
       setUploading(false);
     }
   };
+
+  // Handle "Upload Another" button click
+  const handleUploadAnother = () => {
+    setUploadSuccess(null);
+    setResponseData(null);
+    setShowTracks(false);
+    setUploadError(null);
+  };
+
+  // Handle global drag and drop
+  const handleDragOver = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isDragging) setIsDragging(true);
+    },
+    [isDragging]
+  );
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if the mouse has left the window
+    if (e.clientX === 0 && e.clientY === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    // Clear previous results and errors
+    setUploadSuccess(null);
+    setUploadError(null);
+    setResponseData(null);
+    setShowTracks(false);
+
+    if (
+      e.dataTransfer &&
+      e.dataTransfer.files &&
+      e.dataTransfer.files.length > 0
+    ) {
+      const file = e.dataTransfer.files[0];
+      console.log("File dropped:", file);
+      processFile(file);
+      e.dataTransfer.clearData();
+    } else {
+      console.error("No files found in the drop event.");
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("dragleave", handleDragLeave);
+    window.addEventListener("drop", handleDrop);
+
+    return () => {
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("dragleave", handleDragLeave);
+      window.removeEventListener("drop", handleDrop);
+    };
+  }, [handleDragOver, handleDragLeave, handleDrop]);
 
   // Cleanup the object URL to avoid memory leaks
   useEffect(() => {
@@ -136,10 +218,33 @@ const ImageUploader = () => {
     padding: "10px 20px",
     gap: "10px",
     textDecoration: "none",
+    cursor: "pointer",
+  };
+
+  // Styles for drag overlay
+  const dragOverlayStyle = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    zIndex: 9999,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontSize: "2rem",
+    pointerEvents: "none", // Allow clicks to pass through
   };
 
   return (
-    <div className="text-center">
+    <div className="text-center" style={{ position: "relative" }}>
+      {/* Drag Overlay */}
+      {isDragging && (
+        <div style={dragOverlayStyle}>Drop the image here to upload</div>
+      )}
+
       {/* Hide the header after upload */}
       {!uploadSuccess && <h2>Upload Image</h2>}
 
@@ -160,7 +265,12 @@ const ImageUploader = () => {
           <img
             src={previewUrl}
             alt="Selected preview"
-            style={{ maxWidth: "25%", height: "auto", borderRadius: "8px" }}
+            style={{
+              maxWidth: "25%",
+              height: "auto",
+              borderRadius: "8px",
+              boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+            }}
           />
         </div>
       )}
@@ -184,7 +294,6 @@ const ImageUploader = () => {
       )}
       {uploadError && (
         <div className="alert alert-danger mt-3" role="alert">
-          Fail to upload image. Please REFRESH to try again.
           {uploadError}
         </div>
       )}
@@ -210,9 +319,13 @@ const ImageUploader = () => {
           {responseData.album_image && (
             <div className="d-flex justify-content-center mt-2">
               <img
-                src={responseData.album_image}
+                src={`/media/${responseData.album_image}`}
                 alt="Album image"
-                style={{ maxWidth: "12.5%", borderRadius: "8px" }}
+                style={{
+                  maxWidth: "12.5%",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+                }}
               />
             </div>
           )}
@@ -235,7 +348,6 @@ const ImageUploader = () => {
         </div>
       )}
 
-
       {/* Print the Server Response */}
       {responseData && (
         <div
@@ -247,6 +359,9 @@ const ImageUploader = () => {
             padding: "15px",
             textAlign: "left",
             fontFamily: "monospace",
+            maxWidth: "80%",
+            margin: "0 auto",
+            overflowX: "auto",
           }}
         >
           <div>
@@ -260,7 +375,6 @@ const ImageUploader = () => {
                       fontWeight: "bold",
                     }}
                   >
-                    {/* Use the keyDisplayMap to display a friendly name, fallback to the original key if not found */}
                     {matchAttributes[key] || key}:
                   </span>{" "}
                   <span style={{ color: "#444" }}>
@@ -271,7 +385,9 @@ const ImageUploader = () => {
             {/* Total Duration */}
             {responseData.total_duration && (
               <div style={{ marginBottom: "10px" }}>
-                <span style={{ color: "red", fontWeight: "bold" }}>{matchAttributes["duration"]}:</span>{" "}
+                <span style={{ color: "red", fontWeight: "bold" }}>
+                  {matchAttributes["duration"]}:
+                </span>{" "}
                 <span style={{ color: "#444" }}>
                   {formatDuration(responseData.total_duration)}
                 </span>
@@ -285,6 +401,7 @@ const ImageUploader = () => {
                 style={{
                   fontSize: "1rem",
                   padding: "5px 10px",
+                  cursor: "pointer",
                 }}
               >
                 {showTracks ? "Hide Tracks" : "Show Tracks"}
@@ -343,10 +460,27 @@ const ImageUploader = () => {
             <img
               src="https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg"
               alt="Spotify"
-              style={{ width: "24px", height: "24px", marginRight: "10px" }}
+              style={{
+                width: "24px",
+                height: "24px",
+                marginRight: "10px",
+              }}
             />
             Open in Spotify
           </a>
+        </div>
+      )}
+
+      {/* Upload Another Button */}
+      {uploadSuccess && (
+        <div className="mt-3">
+          <button
+            className="btn btn-secondary"
+            onClick={handleUploadAnother}
+            style={buttonStyle}
+          >
+            Upload Another
+          </button>
         </div>
       )}
     </div>
