@@ -152,10 +152,7 @@ const ImageUploader = () => {
 
   // Handle "Upload Another" button click
   const handleUploadAnother = () => {
-    setUploadSuccess(null);
-    setResponseData(null);
-    setShowTracks(false);
-    setUploadError(null);
+    resetUploader();
   };
 
   // Handle global drag and drop
@@ -306,6 +303,19 @@ const ImageUploader = () => {
       {uploadError && (
         <div className="alert alert-danger mt-3" role="alert">
           {uploadError}
+        </div>
+      )}
+
+      {/* Upload Another Button on Error */}
+      {uploadError && (
+        <div className="mt-3">
+          <button
+            className="btn btn-secondary"
+            onClick={handleUploadAnother}
+            style={buttonStyle}
+          >
+            Upload Another
+          </button>
         </div>
       )}
 
