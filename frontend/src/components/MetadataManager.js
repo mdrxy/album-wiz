@@ -12,6 +12,7 @@ import {
   Badge,
   ProgressBar,
 } from "react-bootstrap";
+import "bootstrap-icons/font/bootstrap-icons.css"; // Import Bootstrap Icons CSS
 
 // A mapping from internal field keys to more user-friendly display names.
 const fieldDisplayNames = {
@@ -109,7 +110,7 @@ const MetadataManager = () => {
     }
 
     if (selectedSources.length === 0) {
-      setError("Please select at least one metadata source.");
+      setError("Please select at least one database.");
       return;
     }
 
@@ -293,10 +294,15 @@ const MetadataManager = () => {
     );
   };
 
-  // If we have multiple sources, change the heading text to reflect the comparison.
+  // If we have multiple sources and identical fields exist, change the heading text to reflect the comparison.
   let headingText = "Metadata";
-  if (fetchedSourcesCount && fetchedSourcesCount > 1) {
-    headingText = `Identical metadata fields between ${formatSources(
+  if (
+    fetchedSourcesCount &&
+    fetchedSourcesCount > 1 &&
+    metadata &&
+    Object.keys(metadata.identical).length > 0
+  ) {
+    headingText = `Shared fields between ${formatSources(
       fetchedSourcesList
     )}`;
   }
@@ -521,8 +527,8 @@ const MetadataManager = () => {
       >
         {/* Artist Input Field */}
         <Form.Group className="mb-3" controlId="formArtist">
-          <Form.Label>
-            <i className="bi bi-person"></i>Artist
+          <Form.Label className="fw-bold">
+            <i className="bi bi-person"></i> Artist
           </Form.Label>
           <Form.Control
             type="text"
@@ -537,8 +543,8 @@ const MetadataManager = () => {
 
         {/* Album Input Field */}
         <Form.Group className="mb-3" controlId="formAlbum">
-          <Form.Label>
-            <i className="bi bi-vinyl"></i>Album
+          <Form.Label className="fw-bold">
+            <i className="bi bi-vinyl"></i> Album
           </Form.Label>
           <Form.Control
             type="text"
@@ -552,7 +558,7 @@ const MetadataManager = () => {
         {/* Metadata Sources Selection */}
         <Form.Group className="mb-3" controlId="formSources">
           <Form.Label>
-            <i className="bi bi-database"></i> Select Databases:
+            <i className="bi bi-database"></i> Search Databases:
           </Form.Label>
           {availableSources.length > 0 ? (
             <div>
@@ -612,11 +618,13 @@ const MetadataManager = () => {
       {/* Display Metadata */}
       {metadata && (
         <div className="mt-4">
-          {/* Identical Metadata Alert */}
-          <Alert variant="success">
-            <h2>{headingText}</h2>
-            {renderMetadata(metadata.identical)}
-          </Alert>
+          {/* Identical Metadata Alert - Only show if there are identical fields */}
+          {Object.keys(metadata.identical).length > 0 && (
+            <Alert variant="success">
+              <h2>{headingText}</h2>
+              {renderMetadata(metadata.identical)}
+            </Alert>
+          )}
 
           {/* If only one source was fetched, user can confirm directly */}
           {fetchedSourcesCount === 1 && (
@@ -640,7 +648,9 @@ const MetadataManager = () => {
             differences &&
             Object.keys(differences).length > 0 && (
               <div className="mt-4">
-                <h2 className="mb-3">Resolve Differences</h2>
+                <h2 className="mb-3">
+  <i className="bi bi-exclamation-triangle me-2 text-warning"></i> Resolve Differences
+</h2>
                 {Object.keys(differences).map((field) => {
                   const label = fieldDisplayNames[field] || field;
                   const allNull = Object.values(differences[field]).every(
