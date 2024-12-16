@@ -168,61 +168,55 @@ const ImageUploader = () => {
     resetUploader();
   };
 
-  // Handle global drag and drop
-  const handleDragOver = useCallback(
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!isDragging) setIsDragging(true);
-    },
-    [isDragging]
-  );
+  // Handle the drag start event
+const handleDragStart = useCallback((event) => {
+  event.dataTransfer.clearData();
+  event.dataTransfer.setData("text/plain", event.target.dataset.item || "file");
+}, []);
 
-  const handleDragLeave = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Check if the mouse has left the window
-    if (e.clientX === 0 && e.clientY === 0) {
-      setIsDragging(false);
-    }
-  }, []);
+// Handle the drag over event
+const handleDragOver = useCallback((event) => {
+  event.preventDefault(); // Prevent default behavior
+  setIsDragging(true);
+}, []);
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
+// Handle the drag leave event
+const handleDragLeave = useCallback((event) => {
+  event.preventDefault(); // Prevent default behavior
+  setIsDragging(false);
+}, []);
 
-    // Clear previous results and errors
-    setUploadSuccess(null);
-    setUploadError(null);
-    setResponseData(null);
-    setShowTracks(false);
+// Handle the drop event
+const handleDrop = useCallback((event) => {
+  event.preventDefault(); // Prevent default behavior
+  setIsDragging(false);
 
-    if (
-      e.dataTransfer &&
-      e.dataTransfer.files &&
-      e.dataTransfer.files.length > 0
-    ) {
-      const file = e.dataTransfer.files[0];
-      console.log("File dropped:", file);
-      processFile(file);
-      e.dataTransfer.clearData();
-    } else {
-      console.error("No files found in the drop event.");
-    }
-  }, []);
+  if (
+    event.dataTransfer &&
+    event.dataTransfer.files &&
+    event.dataTransfer.files.length > 0
+  ) {
+    const file = event.dataTransfer.files[0];
+    console.log("File dropped:", file);
+    processFile(file); // Process the dropped file
+  } else {
+    console.error("No files found in the drop event.");
+  }
+}, [processFile]);
 
   useEffect(() => {
+    window.addEventListener("dragstart", handleDragStart);
     window.addEventListener("dragover", handleDragOver);
     window.addEventListener("dragleave", handleDragLeave);
     window.addEventListener("drop", handleDrop);
 
     return () => {
+      window.removeEventListener("dragstart", handleDragStart);
       window.removeEventListener("dragover", handleDragOver);
       window.removeEventListener("dragleave", handleDragLeave);
       window.removeEventListener("drop", handleDrop);
     };
-  }, [handleDragOver, handleDragLeave, handleDrop]);
+  }, [handleDragStart, handleDragOver, handleDragLeave, handleDrop]);
 
   // Cleanup the object URL to avoid memory leaks
   useEffect(() => {
