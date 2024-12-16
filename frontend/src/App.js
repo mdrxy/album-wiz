@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import MetadataManager from "./components/MetadataManager";
@@ -8,12 +8,18 @@ import NotFound from "./components/NotFound";
 import ServerError from "./components/ServerError";
 
 const App = () => {
+  const [uploaderKey, setUploaderKey] = useState(0);
+
+  const handleAlbumWizClick = () => {
+    setUploaderKey(prevKey => prevKey + 1);
+  };
+
   return (
     <div>
       {/* Navbar */}
       <Navbar bg="dark" variant="dark" expand="lg">
         <Container fluid>
-          <Navbar.Brand as={Link} to="/">
+          <Navbar.Brand as={Link} to="/" onClick={handleAlbumWizClick}>
             album-wiz
           </Navbar.Brand>
           <Navbar.Toggle aria-controls="navbar-nav" />
@@ -33,7 +39,7 @@ const App = () => {
       {/* Main Content Area */}
       <Container className="mt-4">
         <Routes>
-          <Route path="/" element={<ImageUploader />} />
+          <Route path="/" element={<ImageUploader key={uploaderKey} />} />
           <Route path="/metadata" element={<MetadataManager />} />
           <Route path="/library" element={<Library />} />
           <Route path="/500" element={<ServerError />} />

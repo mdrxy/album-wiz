@@ -53,6 +53,17 @@ const ImageUploader = () => {
     "total_duration",
   ];
 
+  const resetUploader = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setUploading(false);
+    setUploadSuccess(null);
+    setUploadError(null);
+    setResponseData(null);
+    setShowTracks(false);
+    setIsDragging(false);
+  };
+
   const formatValue = (key, value) => {
     if (key === "genres" && Array.isArray(value)) {
       return value.join(", ");
