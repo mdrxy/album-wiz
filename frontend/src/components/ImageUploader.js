@@ -169,40 +169,52 @@ const ImageUploader = () => {
   };
 
   // Handle the drag start event
-const handleDragStart = useCallback((event) => {
-  event.dataTransfer.clearData();
-  event.dataTransfer.setData("text/plain", event.target.dataset.item || "file");
-}, []);
+  const handleDragStart = useCallback((event) => {
+    event.dataTransfer.clearData();
+    event.dataTransfer.setData(
+      "text/plain",
+      event.target.dataset.item || "file"
+    );
+  }, []);
 
-// Handle the drag over event
-const handleDragOver = useCallback((event) => {
-  event.preventDefault(); // Prevent default behavior
-  setIsDragging(true);
-}, []);
+  // Handle the drag over event
+  const handleDragOver = useCallback((event) => {
+    event.preventDefault(); // Prevent default behavior
+    setIsDragging(true);
+  }, []);
 
-// Handle the drag leave event
-const handleDragLeave = useCallback((event) => {
-  event.preventDefault(); // Prevent default behavior
-  setIsDragging(false);
-}, []);
+  // Handle the drag leave event
+  const handleDragLeave = useCallback((event) => {
+    event.preventDefault(); // Prevent default behavior
+    setIsDragging(false);
+  }, []);
 
-// Handle the drop event
-const handleDrop = useCallback((event) => {
-  event.preventDefault(); // Prevent default behavior
-  setIsDragging(false);
+  // Handle the drop event
+  const handleDrop = useCallback(
+    (event) => {
+      event.preventDefault(); // Prevent default behavior
+      setIsDragging(false);
+      
+      // Clear previous results and errors
+      setUploadSuccess(null);
+      setUploadError(null);
+      setResponseData(null);
+      setShowTracks(false);
 
-  if (
-    event.dataTransfer &&
-    event.dataTransfer.files &&
-    event.dataTransfer.files.length > 0
-  ) {
-    const file = event.dataTransfer.files[0];
-    console.log("File dropped:", file);
-    processFile(file); // Process the dropped file
-  } else {
-    console.error("No files found in the drop event.");
-  }
-}, [processFile]);
+      if (
+        event.dataTransfer &&
+        event.dataTransfer.files &&
+        event.dataTransfer.files.length > 0
+      ) {
+        const file = event.dataTransfer.files[0];
+        console.log("File dropped:", file);
+        processFile(file); // Process the dropped file
+      } else {
+        console.error("No files found in the drop event.");
+      }
+    },
+    [processFile]
+  );
 
   useEffect(() => {
     window.addEventListener("dragstart", handleDragStart);
@@ -263,7 +275,7 @@ const handleDrop = useCallback((event) => {
       {/* Hide the header after upload */}
       {!uploadSuccess && <h2>Upload Image</h2>}
 
-      <div className="mb-3">
+      <div className="mb-3" style={{ marginTop: "20px" }}>
         {!uploadSuccess && !selectedFile && (
           <label
             htmlFor="fileInput"
@@ -312,7 +324,7 @@ const handleDrop = useCallback((event) => {
               src={previewUrl}
               alt="Selected preview"
               style={{
-                maxWidth: "90%", // Take most of the width on mobile
+                maxWidth: isMobile ? "90%" : "30%",
                 height: "auto",
                 borderRadius: "8px",
                 boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
@@ -392,7 +404,7 @@ const handleDrop = useCallback((event) => {
                 src={`/media/${responseData.album_image}`}
                 alt="Album image"
                 style={{
-                  maxWidth: "90%", // Increased from 12.5% to 90%
+                  maxWidth: isMobile ? "90%" : "30%",
                   height: "auto",
                   borderRadius: "8px",
                   boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
