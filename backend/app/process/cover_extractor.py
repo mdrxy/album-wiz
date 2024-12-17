@@ -15,6 +15,8 @@ from rembg import remove
 # Configure logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+numba_logger = logging.getLogger("r")
+numba_logger.setLevel(logging.WARNING)
 
 # Define the debugging images directory with absolute path
 DEBUGGING_DIR = os.path.abspath("debugging_imgs")
