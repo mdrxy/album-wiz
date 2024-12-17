@@ -87,20 +87,6 @@ services:
     networks:
       - vinyl-network
 
-  # If renaming this service, update REDIS_URL in the .env file
-  cache:
-    image: redis:7
-    container_name: vinyl-cache
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - redis_data:/data
-    networks:
-      - vinyl-network
-
   nginx:
     image: nginx:latest # Use the official Nginx image.
     container_name: vinyl-nginx
