@@ -111,6 +111,8 @@ const MetadataManager = () => {
 
     if (selectedSources.length === 0) {
       setError("Please select at least one database.");
+      setMetadata(null);
+      setDifferences(null);
       return;
     }
 
