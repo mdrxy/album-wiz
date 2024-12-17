@@ -13,6 +13,41 @@ import {
   ButtonGroup,
 } from "react-bootstrap";
 
+// Define cache keys and expiration (e.g., 24 hours)
+const CACHE_KEYS = {
+  ARTISTS: "cache_artists",
+  ALBUMS: "cache_albums",
+};
+const CACHE_EXPIRATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// Utility functions for caching
+const saveToCache = (key, data) => {
+  const cacheEntry = {
+    timestamp: Date.now(),
+    data,
+  };
+  localStorage.setItem(key, JSON.stringify(cacheEntry));
+};
+
+const loadFromCache = (key) => {
+  const cacheEntry = localStorage.getItem(key);
+  if (!cacheEntry) return null;
+
+  try {
+    const parsedEntry = JSON.parse(cacheEntry);
+    const isExpired = Date.now() - parsedEntry.timestamp > CACHE_EXPIRATION;
+    if (isExpired) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return parsedEntry.data;
+  } catch (error) {
+    console.error("Error parsing cache data:", error);
+    localStorage.removeItem(key);
+    return null;
+  }
+};
+
 const Library = () => {
   const [artists, setArtists] = useState([]);
   const [albums, setAlbums] = useState([]);
@@ -24,12 +59,25 @@ const Library = () => {
   const [deleteError, setDeleteError] = useState(null);
   const [selectedAlbums, setSelectedAlbums] = useState([]);
 
-  // Fetch Artists
+  // Fetch Artists with Caching
   useEffect(() => {
     const fetchArtists = async () => {
+      setLoadingArtists(true);
+      setErrorArtists(null);
+
+      // Attempt to load from cache
+      const cachedArtists = loadFromCache(CACHE_KEYS.ARTISTS);
+      if (cachedArtists) {
+        setArtists(cachedArtists);
+        setLoadingArtists(false);
+        return;
+      }
+
+      // Fetch from API if cache is not available or expired
       try {
         const response = await axios.get("/db/artists");
         setArtists(response.data);
+        saveToCache(CACHE_KEYS.ARTISTS, response.data);
       } catch (error) {
         console.error("Error fetching artists:", error);
         setErrorArtists(
@@ -43,12 +91,25 @@ const Library = () => {
     fetchArtists();
   }, []);
 
-  // Fetch Albums
+  // Fetch Albums with Caching
   useEffect(() => {
     const fetchAlbums = async () => {
+      setLoadingAlbums(true);
+      setErrorAlbums(null);
+
+      // Attempt to load from cache
+      const cachedAlbums = loadFromCache(CACHE_KEYS.ALBUMS);
+      if (cachedAlbums) {
+        setAlbums(cachedAlbums);
+        setLoadingAlbums(false);
+        return;
+      }
+
+      // Fetch from API if cache is not available or expired
       try {
         const response = await axios.get("/db/albums");
         setAlbums(response.data);
+        saveToCache(CACHE_KEYS.ALBUMS, response.data);
       } catch (error) {
         console.error("Error fetching albums:", error);
         setErrorAlbums(
@@ -71,14 +132,18 @@ const Library = () => {
       await Promise.all(
         selectedAlbums.map((albumId) => axios.delete(`/album/${albumId}`))
       );
-      setAlbums((prevAlbums) =>
-        prevAlbums.filter((album) => !selectedAlbums.includes(album.id))
+      const updatedAlbums = albums.filter(
+        (album) => !selectedAlbums.includes(album.id)
       );
+      setAlbums(updatedAlbums);
+      saveToCache(CACHE_KEYS.ALBUMS, updatedAlbums); // Update cache
+
       setSelectedAlbums([]);
 
       // Refetch artists to ensure the UI reflects any artist deletions
       const response = await axios.get("/db/artists");
       setArtists(response.data);
+      saveToCache(CACHE_KEYS.ARTISTS, response.data); // Update cache
     } catch (error) {
       console.error("Error deleting albums:", error);
       setDeleteError(
@@ -184,6 +249,7 @@ const Library = () => {
                     </th>
                     <th>Cover</th>
                     <th>Title</th>
+                    <th>Artist</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -203,8 +269,9 @@ const Library = () => {
                         <td>
                           <Image
                             src={
-                              `/media/${album.cover_image}` ||
-                              "/media/placeholder.png"
+                              album.cover_image
+                                ? `/media/${album.cover_image}`
+                                : "/media/placeholder.png"
                             } // Placeholder if no cover URL
                             alt={`${album.cover_image}`}
                             thumbnail
@@ -212,6 +279,7 @@ const Library = () => {
                           />
                         </td>
                         <td>{album.title}</td>
+                        <td>{artist ? artist.name : "Unknown Artist"}</td>
                       </tr>
                     );
                   })}
