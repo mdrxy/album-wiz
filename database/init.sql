@@ -1,6 +1,3 @@
--- Switch to the vinyl_db database
-\c vinyl_db;
-
 -- Add an extension for vectorized queries (pgvector)
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -23,6 +20,7 @@ CREATE TABLE albums (
     duration_seconds INT,                -- Total duration of the album in seconds
     cover_image TEXT,                    -- Cover image file path
                                          -- Assuming all containers use /media as the root directory
+    total_tracks INT DEFAULT 0,          -- Total number of tracks for the album
     embedding VECTOR(256),               -- Vectorized representation for the album (initially empty)
     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
     updated_at TIMESTAMP DEFAULT NOW(),  -- Last updated timestamp
@@ -40,3 +38,53 @@ CREATE TABLE tracks (
     updated_at TIMESTAMP DEFAULT NOW(),  -- Last updated timestamp
     FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE
 );
+
+-- ============================
+-- ====== Trigger Setup ======
+-- ============================
+
+-- Function to increment total_tracks when a new track is added
+CREATE OR REPLACE FUNCTION increment_total_tracks()
+RETURNS TRIGGER AS $$
+DECLARE
+    album_id INT;
+BEGIN
+    -- Retrieve the album_id from the new track
+    album_id := NEW.album_id;
+
+    -- Update the total_tracks count for the album
+    UPDATE albums SET total_tracks = total_tracks + 1 WHERE id = album_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to decrement total_tracks when a track is deleted
+CREATE OR REPLACE FUNCTION decrement_total_tracks()
+RETURNS TRIGGER AS $$
+DECLARE
+    album_id INT;
+BEGIN
+    -- Retrieve the album_id from the deleted track
+    album_id := OLD.album_id;
+
+    -- Update the total_tracks count for the album, ensuring it doesn't go below zero
+    UPDATE albums 
+    SET total_tracks = GREATEST(total_tracks - 1, 0) 
+    WHERE id = album_id;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to call increment_total_tracks after inserting a new track
+CREATE TRIGGER trg_increment_total_tracks
+AFTER INSERT ON tracks
+FOR EACH ROW
+EXECUTE FUNCTION increment_total_tracks();
+
+-- Trigger to call decrement_total_tracks after deleting a track
+CREATE TRIGGER trg_decrement_total_tracks
+AFTER DELETE ON tracks
+FOR EACH ROW
+EXECUTE FUNCTION decrement_total_tracks();
