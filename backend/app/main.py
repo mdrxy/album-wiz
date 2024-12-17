@@ -1,7 +1,5 @@
 """
-Main FastAPI application.
-
-This module contains the main FastAPI application and defines the API routes.
+Contains the main FastAPI application and defines the API routes.
 
 Each route has /api as a prefix, so the full path to the route is /api/{route}.
 """
@@ -22,7 +20,7 @@ from pgvector.asyncpg import register_vector
 
 from app.metadata_orchestrator import MetadataOrchestrator
 from app.import_albums import import_albums
-from app.process.utils import validate_image, get_image, uploadfile_to_bytes
+from app.process.utils import validate_image, get_image
 from app.process.cover_extractor import extract_album_cover
 from app.process.logic import vectorize_image, match_vector
 
@@ -66,6 +64,12 @@ async def lifespan(application: FastAPI) -> AsyncGenerator:
 
     Function creates a connection pool when the application starts and closes
     the pool when the application stops.
+
+    Parameters:
+    - application (FastAPI): The FastAPI application instance.
+
+    Returns:
+    - AsyncGenerator: Asynchronous generator to manage the database connection pool.
     """
     # Create the connection pool using DATABASE_URL
     pool = await asyncpg.create_pool(DATABASE_URL, init=register_vector)
@@ -74,12 +78,12 @@ async def lifespan(application: FastAPI) -> AsyncGenerator:
     await application.state.pool.close()
 
 
-# Initialize FastAPI application
+# Initialize app and router
 app = FastAPI(lifespan=lifespan)
 router = APIRouter()
 orchestrator = MetadataOrchestrator()
 
-# Used to get album covers
+# Mount the /media directory for serving static files (album covers)
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
@@ -88,19 +92,25 @@ async def read_root():
     """
     Default route to test if the API is running.
     """
-    return {"message": "Hello, World!"}
+    return {"message": "Backend is online."}
 
 
 @router.post("/upload")
-async def upload_image(image: UploadFile = File(...)):
+async def upload_image(image: UploadFile = File(...)) -> dict:
     """
-    Endpoint to receive an image file from the homepage.
+    Detect the album cover in an image and return the closest matching record from the database.
 
-    Args:
+    Parameters:
     - image (UploadFile): The image file to save.
 
     Returns:
-    - JSON with the matched album or an error message.
+    - dict: The matched record from the database, or a message if no matches are found.
+
+    Raises:
+    - HTTPException: If the image is invalid or an error occurs during processing.
+
+    Example:
+    - upload_image(image) -> {"artist": "Artist Name", "album": "Album Name", ...}
     """
     logger.info("Received upload request for file: %s", image.filename)
 
@@ -152,24 +162,35 @@ async def upload_image(image: UploadFile = File(...)):
 
 
 @router.post("/album")
-async def upload_album(data: dict):
+async def upload_album(data: dict) -> dict:
     """
     Endpoint to receive album metadata and store it in the database.
 
-    Args:
+    # TODO: refactor into artist, album keys and subkeys
+    Parameters:
     - data (dict): Album metadata to store in the database.
+        - artist_name (str): Name of the artist.
+        - artist_image (str): URL to the artist image.
+        - artist_url (str): URL to the artist's page.
+        - album_name (str): Name of the album.
+        - album_image (str): URL to the album image.
+        - album_url (str): URL to the album
+        - release_date (str): Release date of the album.
+        - genres (list): List of genres.
+        - total_tracks (int): Total number of tracks.
+        - tracks (list): List of track metadata dictionaries.
+            - name (str): Name of the track.
+            - duration (str): Duration of the track.
+            - explicit (bool): True if the track is explicit, False if not, None if unknown.
 
-    Required keys:
-    - artist_name (str): Name of the artist.
-    - album_name (str): Name of the album.
-    - genres (list): List of genres.
-    - artist_image (str): URL to the artist image.
-    - album_image (str): URL to the album image.
-    - release_date (str): Release date of the album.
-    - total_tracks (int): Total number of tracks.
-    - tracks (list): List of track metadata dictionaries.
-    - artist_url (str): URL to the artist's page.
-    - album_url (str): URL to the album
+    Returns:
+    - dict: Success message if the upload completes and the image is vectorized.
+
+    Raises:
+    - HTTPException: If an error occurs during processing.
+
+    Example:
+    - upload_album(data) -> {"message": "Uploaded successfully."}
     """
     async with app.state.pool.acquire() as connection:
         try:
@@ -190,7 +211,8 @@ async def upload_album(data: dict):
             # Insert album
             album_id = await connection.fetchval(
                 """
-                INSERT INTO albums (title, artist_id, image, url, release_date, genres, total_tracks)
+                INSERT INTO albums 
+                (title, artist_id, image, url, release_date, genres, total_tracks)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT (title, artist_id) DO NOTHING
                 RETURNING id;
@@ -228,17 +250,18 @@ async def upload_album(data: dict):
                     track["explicit"],
                 )
 
-            # Vectorize the album cover
+            # Vectorize the provided album cover
             album_cover = await get_image(data["album_image"])
             if not album_cover:
-                logger.error("Failed to retrieve image for album ID %d.", album_id)
+                logger.error(
+                    "Failed to retrieve local image for album ID %d.", album_id
+                )
                 raise HTTPException(
                     status_code=400, detail="Album image retrieval failed."
                 )
             try:
                 await validate_image(album_cover)
-                img_bytes = await uploadfile_to_bytes(album_cover)
-                image_vector = await vectorize_image(img_bytes, model, img_transform)
+                image_vector = await vectorize_image(album_cover, model, img_transform)
                 if not image_vector:
                     raise ValueError(
                         f"Invalid vector format for album ID {album_id}: {image_vector}"
@@ -248,10 +271,10 @@ async def upload_album(data: dict):
                     isinstance(x, (float, int)) for x in image_vector
                 ):
                     raise ValueError(
-                        f"Invalid vector format for album ID {album_id}: {image_vector}"
+                        f"Invalid vector format returned for album ID {album_id}: {image_vector}"
                     )
 
-                # Update the database
+                # Add the embedding to the album record
                 sql_query = "UPDATE albums SET embedding = $1 WHERE id = $2;"
                 await connection.execute(sql_query, image_vector, album_id)
             except (ValueError, TypeError) as vectorization_error:
@@ -263,27 +286,39 @@ async def upload_album(data: dict):
                 raise HTTPException(
                     status_code=500, detail="Vectorization failed."
                 ) from vectorization_error
+
+            return {"message": "Uploaded successfully."}
         except Exception as e:
             logger.error("Error uploading album: %s", traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.delete("/album/{album_id}")
-async def delete_album(album_id: int):
+async def delete_album(album_id: int) -> dict:
     """
     Endpoint to delete an album record from the database.
     If the album is the only one by the artist, the artist will be deleted as well.
+
+    Parameters:
+    - album_id (int): ID of the album to delete.
+
+    Returns:
+    - dict: Success message if the deletion completes.
+
+    Raises:
+    - HTTPException: If the album is not found or an error occurs during deletion.
     """
     async with app.state.pool.acquire() as connection:
         try:
-            # Start a transaction
             async with connection.transaction():
                 # Get the artist ID of the album
                 artist_id = await connection.fetchval(
                     "SELECT artist_id FROM albums WHERE id = $1;", album_id
                 )
                 if not artist_id:
-                    raise HTTPException(status_code=404, detail="Album not found.")
+                    raise HTTPException(
+                        status_code=404, detail=f"Album with ID {album_id} not found."
+                    )
 
                 # Delete the album
                 await connection.execute("DELETE FROM albums WHERE id = $1;", album_id)
@@ -298,10 +333,7 @@ async def delete_album(album_id: int):
                     await connection.execute(
                         "DELETE FROM artists WHERE id = $1;", artist_id
                     )
-
-            return {
-                "message": "Album (and artist, if applicable) deleted successfully."
-            }
+            return {"message": "Album deleted successfully."}
 
         except Exception as e:
             logger.error("Error deleting album: %s", traceback.format_exc())
@@ -309,15 +341,20 @@ async def delete_album(album_id: int):
 
 
 @router.post("/albums")
-async def upload_csv(file: UploadFile = File(...)):
+async def upload_csv(file: UploadFile = File(...)) -> dict:
     """
     Endpoint to upload a CSV file and import album data into the database.
 
-    Args:
+    Temporary files are saved to /tmp and deleted after processing.
+
+    Parameters:
     - file (UploadFile): CSV file containing album data.
 
     Returns:
-    - A success message if the import completes.
+    - dict: Success message if the import completes.
+
+    Raises:
+    - HTTPException: If the file is not a CSV or an error occurs during import.
     """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv files are supported.")
@@ -329,10 +366,7 @@ async def upload_csv(file: UploadFile = File(...)):
             contents = await file.read()
             temp_file.write(contents)
 
-        # Invoke the import_albums function
         await import_albums(app, temp_file_path)
-
-        # Delete the temporary file after use
         os.remove(temp_file_path)
 
         # Vectorize the album covers
@@ -346,11 +380,19 @@ async def upload_csv(file: UploadFile = File(...)):
 
 
 @router.get("/vectorize")
-async def vectorize_albums():
+async def vectorize_albums() -> dict:
     """
     Endpoint to vectorize all album covers in the database.
+
+    Returns:
+    - dict: Success message if the vectorization completes.
+
+    Raises:
+    - HTTPException: If an error occurs during vectorization.
+    - ValueError: If the vector format is invalid.
+    - TypeError: If the vector format is invalid.
     """
-    logger.debug("Starting vectorization of album covers.")
+    logger.debug("Starting vectorization of album covers without vectors.")
     try:
         async with app.state.pool.acquire() as connection:
             sql_query = "SELECT * FROM albums WHERE embedding IS NULL;"
@@ -366,7 +408,9 @@ async def vectorize_albums():
 
                 image = await get_image(image_path)  # UploadFile
                 if not image:
-                    logger.error("Failed to retrieve image for album ID %d.", album_id)
+                    logger.critical(
+                        "Failed to retrieve image for album ID %d.", album_id
+                    )
                     continue  # Skip this album and process the next one
 
                 try:
@@ -375,11 +419,7 @@ async def vectorize_albums():
                         "Image retrieved successfully for album ID %d.", album_id
                     )
 
-                    img_bytes = await uploadfile_to_bytes(image)
-                    image_vector = await vectorize_image(
-                        img_bytes, model, img_transform
-                    )
-
+                    image_vector = await vectorize_image(image, model, img_transform)
                     if not isinstance(image_vector, list) or not all(
                         isinstance(x, (float, int)) for x in image_vector
                     ):
@@ -399,12 +439,12 @@ async def vectorize_albums():
                         "Vector updated successfully for album ID %d.", album_id
                     )
                 except (ValueError, TypeError) as vectorization_error:
-                    logger.error(
+                    logger.critical(
                         "Error processing album ID %d: %s",
                         album_id,
                         str(vectorization_error),
                     )
-                    continue  # Log the error and proceed with the next album
+                    continue  # Proceed with the next album
 
             return {"message": "Albums vectorized successfully."}
     except Exception as e:
@@ -413,19 +453,33 @@ async def vectorize_albums():
 
 
 @router.get("/db/{table_name}")
-async def get_table_data(table_name: str):
+async def get_table_data(table_name: str) -> list:
     """
-    Retrieve all data from the specified table in the database, excluding non-serializable fields like 'embedding'.
+    Retrieve all data from the specified table in the database, excluding non-serializable
+    fields like 'embedding'.
+
+    Parameters:
+    - table_name (str): Name of the table to retrieve data from.
+
+    Returns:
+    - list: List of entries the specified table.
+
+    Raises:
+    - HTTPException: If the table name is invalid or an error occurs during retrieval.
+
+    Example:
+    - get_table_data("albums") -> [{"id": 1, "title": "Album Name", ...}, ...]
     """
+    # TODO: Put in .env or config
     allowed_tables = {"artists", "albums", "tracks"}
 
     if table_name not in allowed_tables:
         raise HTTPException(status_code=400, detail="Invalid table name.")
 
     # Define fields to exclude per table
+    # TODO: Put in .env or config
     excluded_fields = {
         "albums": {"embedding"},
-        # Add other tables and their excluded fields here if needed
     }
 
     try:
@@ -443,15 +497,11 @@ async def get_table_data(table_name: str):
             # Extract column names into a list
             column_names = [record["column_name"] for record in columns]
 
-            # Determine which fields to include by excluding the specified ones
             excluded = excluded_fields.get(table_name, set())
             included_columns = [col for col in column_names if col not in excluded]
 
-            # Construct the SQL query with only the included columns
             columns_str = ", ".join(included_columns)
             sql_query = f"SELECT {columns_str} FROM {table_name};"
-
-            # Execute the query
             rows = await connection.fetch(sql_query)
 
             # Convert rows to list of dictionaries
@@ -487,13 +537,22 @@ async def get_table_data(table_name: str):
 #         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-def hashify(value):
+def hashify(value) -> tuple:
     """
     Recursively convert dictionaries and lists into tuples so that the value is hashable.
     - dict -> tuple of (key, value) pairs sorted by key
     - list -> tuple of hashified elements
 
     Needed for comparison of metadata fields.
+
+    Parameters:
+    - value: The value to hashify.
+
+    Returns:
+    - tuple: Hashed value.
+
+    Example:
+    - hashify({"a": 1, "b": 2}) -> (("a", 1), ("b", 2))
     """
     if isinstance(value, dict):
         # Sort by keys to ensure consistent ordering
@@ -506,6 +565,17 @@ def hashify(value):
 def _flatten_dict(d: dict, parent_key: str = "", sep: str = ".") -> dict:
     """
     Flatten a nested dictionary for easier comparison of metadata fields.
+
+    Parameters:
+    - d (dict): The dictionary to flatten.
+    - parent_key (str): The parent key for nested dictionaries.
+    - sep (str): The separator to use between keys.
+
+    Returns:
+    - dict: Flattened dictionary.
+
+    Example:
+    - _flatten_dict({"a": {"b": 1, "c": 2}}) -> {"a.b": 1, "a.c": 2}
     """
     items = []
     for k, v in d.items():
@@ -524,6 +594,16 @@ def _flatten_dict(d: dict, parent_key: str = "", sep: str = ".") -> dict:
 def _merge_metadata(metadata: dict) -> dict:
     """
     Merge metadata from multiple sources into a single dictionary.
+
+    Parameters:
+    - metadata (dict): Metadata from multiple sources.
+
+    Returns:
+    - dict: Merged metadata.
+
+    Example:
+    - _merge_metadata({"source1": {"a": 1}, "source2": {"b": 2}})
+        -> {"a": 1, "b": 2}
     """
     merged = {}
     for _source, source_metadata in metadata.items():
@@ -540,6 +620,12 @@ def _merge_metadata(metadata: dict) -> dict:
 def _group_by_field(metadata: dict) -> dict:
     """
     Group metadata fields by their values across different sources.
+
+    Parameters:
+    - metadata (dict): Merged metadata from multiple sources.
+
+    Returns:
+    - dict: Grouped metadata fields.
     """
     grouped = {}
     for source, source_metadata in metadata.items():
@@ -565,7 +651,7 @@ async def get_metadata(
 
     NOTE: if only one source returns the album, the album data will return as "identical".
 
-    Args:
+    Parameters:
     - search_query (str): The query to search for, in the format "{artist} - {album}".
     - source (str, optional): Comma-separated list of sources to collect metadata from.
         If None, collect from all sources.
@@ -576,6 +662,9 @@ async def get_metadata(
     Returns:
     - dict: Metadata from the specified source(s), or a comparison highlighting differences
         if applicable.
+
+    Raises:
+    - HTTPException: If the search query is invalid or an error occurs during metadata collection.
     """
     # Validate that the search query is not empty and is in the correct format
     if not search_query:
@@ -664,9 +753,12 @@ async def get_metadata(
 
 
 @router.get("/meta-sources")
-async def get_sources():
+async def get_sources() -> dict:
     """
     Retrieve the list of available metadata sources.
+
+    Returns:
+    - dict: List of available metadata sources.
     """
     sources = [collector.get_name() for collector in orchestrator.collectors]
     return {"sources": sources}
