@@ -98,9 +98,8 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
             tracks_list = record["tracks"] if isinstance(record["tracks"], list) else []
 
             matched_record = {
-                "name": record["name"],  # Album name
+                "album_name": record["name"],  # Album name
                 "artist_name": record["artist_name"],
-                "album_name": record["name"],  # Assuming album_name is same as name
                 # "album_url": record["album_url"],
                 "release_date": record["release_date"],
                 "genres": genres_list,

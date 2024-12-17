@@ -25,7 +25,6 @@ const ImageUploader = () => {
   }, []);
 
   // Helper function to format duration
-  
 
   // Format values for better display
   const monthNames = {
@@ -76,11 +75,11 @@ const ImageUploader = () => {
   const formatDuration = (value) => {
     const totalSeconds = parseInt(value, 10);
     if (isNaN(totalSeconds) || totalSeconds < 0) return "0m 0s";
-  
+
     const hours = Math.floor(totalSeconds / 3600); // Calculate hours
     const minutes = Math.floor((totalSeconds % 3600) / 60); // Remaining minutes
     const seconds = totalSeconds % 60; // Remaining seconds
-  
+
     if (hours > 0) {
       return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
     }
@@ -88,38 +87,38 @@ const ImageUploader = () => {
   };
 
   const formatValue = (key, value) => {
-  if (key === "genres" && Array.isArray(value)) {
-    return value.join(", ");
-  }
-  if (key === "release_date" && typeof value === "string") {
-    // Transform 'YYYY-MM' to 'Month YYYY'
-    const [year, month] = value.split("-");
-    return `${monthNames[month] || month} ${year}`;
-  }
-  if (key === "duration") {
-    return formatDuration(value); // Use formatDuration helper
-  }
-  if (key === "similarity") {
-    let color;
-    if (value < 25) color = "red";
-    else if (value >= 25 && value <= 75) color = "orange";
-    else color = "green";
-    return (
-      <span style={{ color, fontWeight: "bold" }}>
-        {parseFloat(value).toFixed(2)}
-      </span>
-    );
-  }
-  if (Array.isArray(value)) {
-    return `[ ${value
-      .map((v) => (typeof v === "object" ? JSON.stringify(v) : v))
-      .join(", ")} ]`;
-  }
-  if (typeof value === "object" && value !== null) {
-    return JSON.stringify(value);
-  }
-  return value;
-};
+    if (key === "genres" && Array.isArray(value)) {
+      return value.join(", ");
+    }
+    if (key === "release_date" && typeof value === "string") {
+      // Transform 'YYYY-MM' to 'Month YYYY'
+      const [year, month] = value.split("-");
+      return `${monthNames[month] || month} ${year}`;
+    }
+    if (key === "duration") {
+      return formatDuration(value); // Use formatDuration helper
+    }
+    if (key === "similarity") {
+      let color;
+      if (value < 25) color = "red";
+      else if (value >= 25 && value <= 75) color = "orange";
+      else color = "green";
+      return (
+        <span style={{ color, fontWeight: "bold" }}>
+          {parseFloat(value).toFixed(2)}
+        </span>
+      );
+    }
+    if (Array.isArray(value)) {
+      return `[ ${value
+        .map((v) => (typeof v === "object" ? JSON.stringify(v) : v))
+        .join(", ")} ]`;
+    }
+    if (typeof value === "object" && value !== null) {
+      return JSON.stringify(value);
+    }
+    return value;
+  };
 
   // Handle file selection via input
   const handleFileChange = (e) => {
@@ -287,7 +286,10 @@ const ImageUploader = () => {
   };
 
   return (
-    <div className="text-center" style={{ position: "relative" }}>
+    <div
+      className="text-center"
+      style={{ position: "relative", paddingBottom: "50px" }} // Added paddingBottom
+    >
       {/* Drag Overlay */}
       {isDragging && (
         <div style={dragOverlayStyle}>Drop the image here to upload</div>
@@ -498,7 +500,7 @@ const ImageUploader = () => {
               </div>
             )}
             {/* Show/Hide Tracks Button */}
-            {responseData.tracks && (
+            {responseData.tracks && responseData.tracks.length > 0 && (
               <button
                 className="btn btn-secondary mt-2"
                 onClick={() => setShowTracks((prev) => !prev)}
@@ -511,42 +513,45 @@ const ImageUploader = () => {
                 {showTracks ? "Hide Tracks" : "Show Tracks"}
               </button>
             )}
-            {showTracks && responseData.tracks && (
-              <ul
-                style={{
-                  marginTop: "10px",
-                  paddingLeft: "40px",
-                  listStyleType: "decimal-leading-zero",
-                }}
-              >
-                {responseData.tracks.map((track, index) => {
-                  const minutes = Math.floor(track.duration / 60);
-                  const seconds = track.duration % 60;
+            {showTracks &&
+              responseData.tracks &&
+              responseData.tracks.length > 0 && (
+                <ul
+                  style={{
+                    marginTop: "10px",
+                    paddingLeft: "40px",
+                    listStyleType: "decimal-leading-zero",
+                  }}
+                >
+                  {responseData.tracks.map((track, index) => {
+                    const minutes = Math.floor(track.duration / 60);
+                    const seconds = track.duration % 60;
 
-                  // Dynamically determine the duration color
-                  const durationStyle = {
-                    color:
-                      minutes > 5 ? "red" : minutes < 3 ? "blue" : "inherit",
-                  };
+                    // Dynamically determine the duration color
+                    const durationStyle = {
+                      color:
+                        minutes > 5 ? "red" : minutes < 3 ? "blue" : "inherit",
+                    };
 
-                  return (
-                    <li key={index} style={{ marginBottom: "10px" }}>
-                      <b>{track.name}</b> <br />
-                      <span style={durationStyle}>
-                        {minutes}m {seconds}s
-                      </span>
-                      <br />
-                      {(track.explicit === true || track.explicit === null) && (
-                        <span style={{ color: "red" }}>
-                          Explicit
-                          {track.explicit === true ? "" : ": Unknown"} <br />
+                    return (
+                      <li key={index} style={{ marginBottom: "10px" }}>
+                        <b>{track.name}</b> <br />
+                        <span style={durationStyle}>
+                          {minutes}m {seconds}s
                         </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                        <br />
+                        {(track.explicit === true ||
+                          track.explicit === null) && (
+                          <span style={{ color: "red" }}>
+                            Explicit
+                            {track.explicit === true ? "" : ": Unknown"} <br />
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
           </div>
         </div>
       )}
