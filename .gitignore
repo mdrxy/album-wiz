@@ -165,3 +165,4 @@ myenv/
 node_modules/
 backend/import.csv
 .DS_Store
+debugging_imgs/
