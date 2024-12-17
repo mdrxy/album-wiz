@@ -25,11 +25,7 @@ const ImageUploader = () => {
   }, []);
 
   // Helper function to format duration
-  const formatDuration = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes} minutes`;
-  };
+  
 
   // Format values for better display
   const monthNames = {
@@ -50,8 +46,8 @@ const ImageUploader = () => {
   const matchAttributes = {
     artist_name: "Artist",
     album_name: "Release",
-    release_date: "Released",
     genres: "Genres",
+    release_date: "Released",
     total_tracks: "# Tracks",
     duration: "Duration",
     tracks: "Tracks",
@@ -77,28 +73,53 @@ const ImageUploader = () => {
     setIsDragging(false);
   };
 
-  const formatValue = (key, value) => {
-    if (key === "genres" && Array.isArray(value)) {
-      return value.join(", ");
+  const formatDuration = (value) => {
+    const totalSeconds = parseInt(value, 10);
+    if (isNaN(totalSeconds) || totalSeconds < 0) return "0m 0s";
+  
+    const hours = Math.floor(totalSeconds / 3600); // Calculate hours
+    const minutes = Math.floor((totalSeconds % 3600) / 60); // Remaining minutes
+    const seconds = totalSeconds % 60; // Remaining seconds
+  
+    if (hours > 0) {
+      return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
     }
-    if (key === "release_date" && typeof value === "string") {
-      // Transform 'YYYY-MM' to 'Month YYYY'
-      const [year, month] = value.split("-");
-      return `${monthNames[month] || month} ${year}`;
-    }
-    if (key === "total_duration") {
-      return formatDuration(value);
-    }
-    if (Array.isArray(value)) {
-      return `[ ${value
-        .map((v) => (typeof v === "object" ? JSON.stringify(v) : v))
-        .join(", ")} ]`;
-    }
-    if (typeof value === "object" && value !== null) {
-      return JSON.stringify(value);
-    }
-    return value;
+    return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
   };
+
+  const formatValue = (key, value) => {
+  if (key === "genres" && Array.isArray(value)) {
+    return value.join(", ");
+  }
+  if (key === "release_date" && typeof value === "string") {
+    // Transform 'YYYY-MM' to 'Month YYYY'
+    const [year, month] = value.split("-");
+    return `${monthNames[month] || month} ${year}`;
+  }
+  if (key === "duration") {
+    return formatDuration(value); // Use formatDuration helper
+  }
+  if (key === "similarity") {
+    let color;
+    if (value < 25) color = "red";
+    else if (value >= 25 && value <= 75) color = "orange";
+    else color = "green";
+    return (
+      <span style={{ color, fontWeight: "bold" }}>
+        {parseFloat(value).toFixed(2)}
+      </span>
+    );
+  }
+  if (Array.isArray(value)) {
+    return `[ ${value
+      .map((v) => (typeof v === "object" ? JSON.stringify(v) : v))
+      .join(", ")} ]`;
+  }
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
+  return value;
+};
 
   // Handle file selection via input
   const handleFileChange = (e) => {
