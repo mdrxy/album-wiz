@@ -20,6 +20,7 @@ CREATE TABLE albums (
     duration_seconds INT,                -- Total duration of the album in seconds
     cover_image TEXT,                    -- Cover image file path
                                          -- Assuming all containers use /media as the root directory
+    album_url TEXT,                      -- URL to the album on the streaming platform
     total_tracks INT DEFAULT 0,          -- Total number of tracks for the album
     embedding VECTOR(256),               -- Vectorized representation for the album (initially empty)
     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
@@ -28,7 +29,7 @@ CREATE TABLE albums (
 );
 
 -- Create the tracks table to store track details
-CREATE TABLE tracks (
+CREATE TABLE IF NOT EXISTS tracks (
     id SERIAL PRIMARY KEY,               -- Unique identifier for the track
     album_id INT NOT NULL,               -- Foreign key to the album
     title VARCHAR(255) NOT NULL,         -- Track title
@@ -36,7 +37,8 @@ CREATE TABLE tracks (
     explicit BOOLEAN,                    -- Indicates if the track contains explicit content
     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
     updated_at TIMESTAMP DEFAULT NOW(),  -- Last updated timestamp
-    FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE
+    FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE,
+    CONSTRAINT unique_title_album UNIQUE (title, album_id)
 );
 
 -- ============================
