@@ -56,7 +56,7 @@ def save_image(image: np.ndarray, filename: str):
         save_path = os.path.join(DEBUGGING_DIR, filename)
         img.save(save_path)
         logger.debug("Saved image: %s", save_path)
-    except Exception as e:
+    except (OSError, IOError, ValueError) as e:
         logger.error("Failed to save image %s: %s", filename, e)
 
 
@@ -177,6 +177,14 @@ def lines_proximity(
     Returns:
     - bool: True if lines are close, False otherwise.
     """
+    # Validate that each line has exactly four coordinates
+    if len(line_1) != 4:
+        logger.error("Invalid line_1 format: %s. Expected 4 values.", line_1)
+        return False
+    if len(line_2) != 4:
+        logger.error("Invalid line_2 format: %s. Expected 4 values.", line_2)
+        return False
+
     x1, y1, x2, y2 = line_1
     x3, y3, x4, y4 = line_2
     for coord_1 in [np.array((x1, y1)), np.array((x2, y2))]:
@@ -203,19 +211,55 @@ def find_lines_intersection(
     x1, y1, x2, y2 = line_1
     x3, y3, x4, y4 = line_2
 
-    denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-    if denom == 0:
-        logger.warning("Lines are parallel; no intersection.")
-        return None
+    vertical_1 = False
 
-    x_intersect = (
-        (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)
-    ) / denom
-    y_intersect = (
-        (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)
-    ) / denom
-    logger.debug("Intersection point: (%s, %s)", x_intersect, y_intersect)
+    if x1 != x2:
+        slope_1 = (y2 - y1) / (x2 - x1)
+    else:
+        vertical_1 = True
+
+    vertical_2 = False
+
+    if x3 != x4:
+        slope_2 = (y4 - y3) / (x4 - x3)
+    else:
+        vertical_2 = True
+
+    if vertical_1 and vertical_2:
+        return None, None
+
+    elif vertical_1:
+        x_intersect = x1
+        y_intersect = slope_2 * x_intersect + (y3 - slope_2 * x3)
+
+    elif vertical_2:
+        x_intersect = x3
+        y_intersect = slope_1 * x_intersect + (y1 - slope_1 * x1)
+
+    else:
+        intercept_1 = y1 - slope_1 * x1
+        intercept_2 = y3 - slope_2 * x3
+        if slope_1 != slope_2:
+            x_intersect = (intercept_2 - intercept_1) / (slope_1 - slope_2)
+        else:
+            return None, None
+        y_intersect = x_intersect * slope_1 + intercept_1
+
     return (x_intersect, y_intersect)
+
+    # denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+    # if denom == 0:
+    #     logger.warning("Lines are parallel; no intersection.")
+    #     return None
+
+    # x_intersect = (
+    #     (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)
+    # ) / denom
+    # y_intersect = (
+    #     (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)
+    # ) / denom
+    # logger.debug("Intersection point: (%s, %s)", x_intersect, y_intersect)
+    # return (x_intersect, y_intersect)
 
 
 def detect_lines(img: np.ndarray) -> List[List[int]]:
@@ -244,8 +288,14 @@ def detect_lines(img: np.ndarray) -> List[List[int]]:
         logger.warning("No lines detected.")
         return []
 
-    flattened_lines = [list(line.flatten()) for line in lines]
-    logger.debug("Detected %d lines.", len(flattened_lines))
+    flattened_lines = []
+    for line in lines:
+        if len(line.flatten()) == 4:
+            flattened_lines.append(list(line.flatten()))
+        else:
+            logger.error("Detected line does not have 4 coordinates: %s", line)
+
+    logger.debug("Detected %d valid lines.", len(flattened_lines))
 
     # Optional: Draw detected lines on the image for debugging
     line_img = img.copy()
@@ -302,13 +352,6 @@ def filter_unique_lines(lines: list, threshold: float) -> list:
 
     logger.debug("Filtered down to %d unique lines.", len(unique_lines))
 
-    # Optional: Draw unique lines on the image for debugging
-    # unique_line_img = np.zeros_like(img)
-    # for line in unique_lines:
-    #     x1, y1, x2, y2 = line
-    #     cv2.line(unique_line_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-    # save_image(unique_line_img, "6-unique_lines.png")
-
     logger.debug("Exiting filter_unique_lines")
     return unique_lines
 
@@ -328,12 +371,21 @@ def find_most_parallel_pairs(lines: list, threshold: float) -> list:
     line_pairs = []
     similarities = []
 
-    for line in lines:
+    for idx, line in enumerate(lines):
+        if len(line) != 4:
+            logger.error("Line at index %d is malformed: %s", idx, line)
+            continue  # Skip malformed lines
+
         best_pair = None
         best_similarity = 0
-        for next_line in lines:
+        for next_idx, next_line in enumerate(lines):
             if np.array_equal(next_line, line):
                 continue
+            if len(next_line) != 4:
+                logger.error(
+                    "Next line at index %d is malformed: %s", next_idx, next_line
+                )
+                continue  # Skip malformed lines
             if lines_proximity(next_line, line, threshold):
                 continue
             similarity = calculate_parallel_similarity(line, next_line)
@@ -348,7 +400,7 @@ def find_most_parallel_pairs(lines: list, threshold: float) -> list:
         for pair in line_pairs:
             best_1, best_2 = best_pair
             curr_1, curr_2 = pair
-            if (best_1 == curr_1 or best_2 == curr_2) or (
+            if (best_1 == curr_1 and best_2 == curr_2) or (
                 best_1 == curr_2 and best_2 == curr_1
             ):
                 new_pair = False
@@ -381,7 +433,77 @@ def find_most_parallel_pairs(lines: list, threshold: float) -> list:
     return best_pairs
 
 
-def find_corners_from_lines(line_pairs: list, img: np.ndarray) -> list:
+def find_best_corners(
+    pairs: list, img: np.ndarray
+) -> Optional[List[Tuple[float, float]]]:
+    """
+    Find the best set of corners from parallel line pairs.
+
+    Parameters:
+    - pairs (list): List of parallel line pairs.
+    - img (np.ndarray): The image array for visualization.
+
+    Returns:
+    - Optional[list]: List of corner points or None if detection fails.
+    """
+    logger.debug("Entering find_best_corners")
+    all_corners = []
+    ratio_distances = []
+    sets_of_corners = []
+
+    # Iterate over all unique combinations of two pairs
+    for i, first_pair in enumerate(pairs):
+        for second_pair in pairs[i + 1 :]:
+            # Ensure that the pairs are not the same and not parallel
+            if (
+                first_pair[0] == second_pair[0] and first_pair[1] == second_pair[1]
+            ) or (first_pair[1] == second_pair[0] and first_pair[0] == second_pair[1]):
+                continue
+            if calculate_parallel_similarity(first_pair[0], second_pair[0]) > 0.9:
+                continue
+
+            # Find corners from the two pairs
+            corners = find_corners_from_lines([first_pair, second_pair], img)
+            if corners is None:
+                continue
+
+            reformatted_corners = reformat_corners(corners)
+            if reformatted_corners is None:
+                continue
+
+            sets_of_corners.append(reformatted_corners)
+            (x1, y1), (x2, y2), (x3, y3), (x4, y4) = reformatted_corners
+
+            # Calculate width and height to assess ratio
+            width_top = calculate_line_length((x1, y1, x2, y2))
+            width_bottom = calculate_line_length((x3, y3, x4, y4))
+            width = (width_top + width_bottom) / 2
+
+            height_left = calculate_line_length((x1, y1, x4, y4))
+            height_right = calculate_line_length((x2, y2, x3, y3))
+            height = (height_left + height_right) / 2
+
+            ratio = width / height
+            distance_from_1 = abs(ratio - 1)
+
+            all_corners.append([first_pair, second_pair])
+            ratio_distances.append(distance_from_1)
+
+    if not ratio_distances:
+        logger.error("No valid corner sets found.")
+        return None
+
+    # Find the set of corners with the smallest distance from a square ratio
+    best_idx = np.argmin(ratio_distances)
+    best_corners = sets_of_corners[best_idx]
+    logger.debug("Best corners selected: %s", best_corners)
+    logger.debug("Exiting find_best_corners")
+    return best_corners
+
+
+def find_corners_from_lines(
+    line_pairs: list, img: np.ndarray
+) -> Optional[List[Tuple[float, float]]]:
     """
     Find the corners of the square from parallel line pairs.
 
@@ -390,37 +512,51 @@ def find_corners_from_lines(line_pairs: list, img: np.ndarray) -> list:
     - img (np.ndarray): The three-channel image array for visualization.
 
     Returns:
-    - list: List of corner points as (x, y) tuples.
+    - list: List of corner points as (x, y) tuples, or None if intersections are invalid.
     """
     logger.debug("Entering find_corners_from_lines")
     corners = []
     if len(line_pairs) < 2:
         logger.warning("Not enough line pairs to determine corners.")
-        return corners
+        return None
 
     pair_1, pair_2 = line_pairs
     for line_1 in pair_1:
         for line_2 in pair_2:
             intersection = find_lines_intersection(line_1, line_2)
-            if intersection:
-                corners.append(intersection)
-                x1, y1, x2, y2 = line_1
-                x3, y3, x4, y4 = line_2
-
-                # Draw lines in green with increased thickness
-                cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 4)
-                cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0, 255, 0), 4)
-
-                # Draw intersection point with a larger blue circle
-                cv2.circle(
-                    img,
-                    (int(intersection[0]), int(intersection[1])),
-                    50,  # Radius
-                    (255, 0, 0),
-                    -1,
+            if intersection is None:
+                logger.warning(
+                    "Intersection failed for lines: %s and %s", line_1, line_2
                 )
+                continue
+
+            try:
+                corners.append((int(intersection[0]), int(intersection[1])))
+            except (ValueError, TypeError) as e:
+                logger.error("Failed to process intersection: %s", e)
+                continue
+
+            # Draw lines and intersections for debugging
+            x1, y1, x2, y2 = line_1
+            x3, y3, x4, y4 = line_2
+
+            cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 4)
+            cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0, 255, 0), 4)
+
+            # Draw intersection point
+            cv2.circle(
+                img,
+                (int(intersection[0]), int(intersection[1])),
+                50,  # Radius
+                (255, 0, 0),
+                -1,
+            )
 
     save_image(img, "6-corners_detected.png")
+
+    if len(corners) != 4:
+        logger.error("Failed to detect exactly 4 corners; detected %d.", len(corners))
+        return None
 
     logger.debug("Detected %d corners.", len(corners))
     logger.debug("Exiting find_corners_from_lines")
@@ -450,7 +586,7 @@ def detect_corners(img: np.ndarray) -> Optional[List[Tuple[float, float]]]:
         logger.debug("Image already has multiple channels. Made a writable copy.")
 
     lines = detect_lines(img)
-    proximity_threshold = height * 0.3 if height < width else width * 0.3
+    proximity_threshold = height * 0.4 if height < width else width * 0.4
     unique_lines = filter_unique_lines(lines, proximity_threshold)
 
     if len(unique_lines) < 4:
@@ -463,18 +599,25 @@ def detect_corners(img: np.ndarray) -> Optional[List[Tuple[float, float]]]:
         logger.error("Not enough parallel pairs detected to find corners.")
         return None
 
-    corners = find_corners_from_lines(best_pairs, img_bgr)
+    corners = find_best_corners(best_pairs, img_bgr)
+
+    # Ensure corners is valid
+    if corners is None:
+        logger.error("Corner detection failed.")
+        return None
+    if corners.size == 0:
+        logger.error("Corners array is empty.")
+        return None
 
     # Validate corner positions
     for corner in corners:
         if not (0 <= corner[0] <= width and 0 <= corner[1] <= height):
             logger.warning("Corner out of bounds: %s", corner)
             return None
+        else:
+            logger.error("Corner detection failed.")
 
-    if corners:
-        logger.info("Corners detected successfully.")
-    else:
-        logger.error("Corner detection failed.")
+    logger.info("Corners detected successfully.")
 
     logger.debug("Exiting detect_corners")
     return corners
@@ -585,14 +728,16 @@ def crop_to_square(image: Image.Image) -> Optional[Image.Image]:
         sharpened_img = sharpen_image(img_arr)
         logger.debug("Image sharpened.")
 
-        bg_removed_img = remove_background(sharpened_img)
-        if bg_removed_img is None:
+        bg_removed_img = 255 * np.uint8(remove_background(sharpened_img) > 150)
+        kernel = np.ones((5, 5), np.uint8)
+        bg_removed_img_dilated = cv2.dilate(bg_removed_img, kernel)
+        if bg_removed_img_dilated is None:
             logger.error("Background removal failed.")
             return None
         logger.debug("Background removed from image.")
 
-        corners = detect_corners(bg_removed_img)
-        if corners is None:
+        corners = detect_corners(bg_removed_img_dilated)
+        if corners is None or corners.size == 0:
             logger.error("Corner detection failed.")
             return None
         logger.debug("Corners detected: %s", corners)
