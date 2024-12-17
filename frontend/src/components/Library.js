@@ -137,26 +137,29 @@ const Library = () => {
                     );
                     return (
                       <tr key={album.id}>
-                      <td>
-                        <Image
-                        src={`/media/${album.cover_image}` || "/media/placeholder.png"} // Placeholder if no cover URL
-                        alt={`${album.cover_image}`}
-                        thumbnail
-                        style={{ maxWidth: "100px" }}
-                        />
-                      </td>
-                      <td>{album.title}</td>
-                      <td>{artist ? artist.name : "Unknown Artist"}</td>
-                      <td>
-                        <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => deleteAlbum(album.id)}
-                        disabled={deletingAlbum}
-                        >
-                        {deletingAlbum ? "Deleting..." : "Delete"}
-                        </Button>
-                      </td>
+                        <td>
+                          <Image
+                            src={
+                              `/media/${album.cover_image}` ||
+                              "/media/placeholder.png"
+                            } // Placeholder if no cover URL
+                            alt={`${album.cover_image}`}
+                            thumbnail
+                            style={{ maxWidth: "100px" }}
+                          />
+                        </td>
+                        <td>{album.title}</td>
+                        <td>{artist ? artist.name : "Unknown Artist"}</td>
+                        <td>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => deleteAlbum(album.id)}
+                            disabled={deletingAlbum}
+                          >
+                            {deletingAlbum ? "Deleting..." : "Delete"}
+                          </Button>
+                        </td>
                       </tr>
                     );
                   })}

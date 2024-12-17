@@ -302,9 +302,7 @@ const MetadataManager = () => {
     metadata &&
     Object.keys(metadata.identical).length > 0
   ) {
-    headingText = `Shared fields between ${formatSources(
-      fetchedSourcesList
-    )}`;
+    headingText = `Shared fields between ${formatSources(fetchedSourcesList)}`;
   }
 
   // Display a single metadata field in a user-friendly way.
@@ -649,8 +647,9 @@ const MetadataManager = () => {
             Object.keys(differences).length > 0 && (
               <div className="mt-4">
                 <h2 className="mb-3">
-  <i className="bi bi-exclamation-triangle me-2 text-warning"></i> Resolve Differences
-</h2>
+                  <i className="bi bi-exclamation-triangle me-2 text-warning"></i>{" "}
+                  Resolve Differences
+                </h2>
                 {Object.keys(differences).map((field) => {
                   const label = fieldDisplayNames[field] || field;
                   const allNull = Object.values(differences[field]).every(

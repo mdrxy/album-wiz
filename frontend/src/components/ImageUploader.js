@@ -194,7 +194,7 @@ const ImageUploader = () => {
     (event) => {
       event.preventDefault(); // Prevent default behavior
       setIsDragging(false);
-      
+
       // Clear previous results and errors
       setUploadSuccess(null);
       setUploadError(null);

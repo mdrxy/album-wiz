@@ -19,17 +19,23 @@ logger.setLevel(logging.DEBUG)
 logger.info("Initializing import_albums module")
 
 
-async def import_albums(app: FastAPI, csv_file: str):
+async def import_albums(app: FastAPI, csv_file: str) -> None:
     """
     Import album data from a CSV file into the PostgreSQL database.
 
-    Args:
+    Parameters:
     - app (FastAPI): The FastAPI application instance with the database pool.
     - csv_file (str): Path to the CSV file containing album data.
+
+    Returns:
+    - None
+
+    Raises:
+    - ValueError: If there is an error reading the CSV file.
+    - RuntimeError: If there is an error importing the data into the database.
     """
     logger.info("Starting import from %s", csv_file)
 
-    # Load the CSV file
     try:
         data = pd.read_csv(csv_file)
         logger.debug("CSV file %s loaded successfully", csv_file)
@@ -74,7 +80,6 @@ async def import_albums(app: FastAPI, csv_file: str):
                         row["Release"],
                         row["Artist"],
                     )
-
         logger.info("Import completed successfully")
 
     except Exception as e:

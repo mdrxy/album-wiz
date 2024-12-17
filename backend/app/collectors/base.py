@@ -1,5 +1,5 @@
 """
-This module defines the abstract base class for metadata collectors.
+Abstract base class for metadata collectors.
 """
 
 from abc import ABC, abstractmethod
@@ -14,12 +14,6 @@ class MetadataCollector(ABC):
     """
 
     def __init__(self, name: str):
-        """
-        Initialize the metadata collector with a name.
-
-        Args:
-        - name (str): The name of the metadata collector.
-        """
         self.name = name
 
     def get_name(self) -> str:
@@ -36,7 +30,7 @@ class MetadataCollector(ABC):
         """
         Fetch metadata for a given record.
 
-        Args:
+        Parameters:
         - query (str): The query to search for. This should probably be in the format:
             "{artist} - {album}".
 
@@ -82,4 +76,8 @@ class MetadataCollector(ABC):
         - "url": URL to the album's page on the source website
 
         TODO: some albums have multiple artists, how should we handle this?
+
+        Examples:
+        - fetch_metadata("The Beatles - Abbey Road")
         """
+        # TODO: put the others here
