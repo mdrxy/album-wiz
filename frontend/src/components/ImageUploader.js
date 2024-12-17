@@ -288,7 +288,7 @@ const ImageUploader = () => {
   return (
     <div
       className="text-center"
-      style={{ position: "relative", paddingBottom: "50px" }} // Added paddingBottom
+      style={{ position: "relative", paddingBottom: "50px" }}
     >
       {/* Drag Overlay */}
       {isDragging && (
