@@ -44,8 +44,6 @@ services:
       database:
         # Ensure the database container starts before the backend
         condition: service_healthy
-      cache:
-        condition: service_healthy # Ensure the Redis cache container starts before the backend
     networks:
       - vinyl-network
 
@@ -101,7 +99,6 @@ services:
       - frontend
       - backend
       - database
-      - cache
     networks:
       - vinyl-network
 
