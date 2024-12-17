@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from rembg import remove
-import glob
 
 
 def remove_background(img):
@@ -12,12 +11,10 @@ def remove_background(img):
 
 
 def sharpen_image(img):
-    # Create the sharpening kernel 
     kernel = np.array([[0, -2, 0], 
                        [-2, 10, -2], 
                        [0, -2, 0]])
     
-    # Sharpen the image 
     sharpened_image = cv2.filter2D(img, -1, kernel) 
 
     return sharpened_image
@@ -93,24 +90,13 @@ def find_lines_intersection(line_1, line_2):
     return (x_intersect, y_intersect)
 
 def detect_lines(img):
-    # Canny edge detection
     edges = cv2.Canny(img, 50, 150, apertureSize=3)
 
     edges_dilated = cv2.dilate(edges, None)
 
-    # Hough Line Transform
     lines = cv2.HoughLinesP(edges_dilated, 1, np.pi/180, 100, minLineLength=100, maxLineGap=100)
 
     flattened_lines = [list(line.flatten()) for line in lines]
-
-    # for line in flattened_lines:
-    #     x1, y1, x2, y2 = line
-    #     s = f'{x1} {y1}  {x2} {y2}'
-    #     plt.plot([x1, x2], [y1,y2], color='red')
-    #     plt.text(x1, y1, s, color='white', fontsize=10)
-    # plt.title('flattened lines')
-    # plt.imshow(img)
-    # plt.show()
 
     return flattened_lines
 
@@ -122,7 +108,7 @@ def filter_unique_lines(lines, threshold):
             unique_lines.append(curr_line)
             continue
         similar_lines = False
-        for pivot_line in unique_lines: # TODO: change pivot_line variable name
+        for pivot_line in unique_lines:
             close_coords = lines_proximity(curr_line, pivot_line, threshold)
             similar_angles = calculate_parallel_similarity(curr_line, pivot_line) > 0.92
 
@@ -141,15 +127,6 @@ def filter_unique_lines(lines, threshold):
         else:
             unique_lines.append(curr_line)
 
-    # for line in unique_lines:
-    #     x1, y1, x2, y2 = line
-    #     s = f'{x1} {y1}  {x2} {y2}'
-    #     plt.plot([x1, x2], [y1,y2], color='red')
-    #     plt.text(x1, y1, s, color='white', fontsize=10)
-    # plt.title('unique lines (1st filter)')
-    # plt.imshow(img)
-    # plt.show()
-
     return unique_lines
 
 
@@ -163,13 +140,6 @@ def find_corners_from_lines(line_pairs):
             if x_intersect is None and y_intersect is None:
                 return None
             corners.append((x_intersect, y_intersect))
-    #         x1, y1, x2, y2 = line_1
-    #         x3, y3, x4, y4 = line_2
-    #         plt.plot([x1, x2], [y1,y2], color='red')
-    #         plt.plot([x3, x4], [y3,y4], color='red')
-    #         plt.plot(x_intersect, y_intersect, 'bo')
-    # plt.imshow(img)
-    # plt.show()
 
     return corners
 
@@ -189,6 +159,9 @@ def find_parallel_pairs(lines, threshold):
             if similarity > best_similarity:
                 best_pair = (line, next_line)
                 best_similarity = similarity
+
+        if best_pair is None:
+            continue
 
         new_pair = True
         for pair in line_pairs:
@@ -248,20 +221,7 @@ def find_best_corners(lines, threshold, img):
     
     sorted_dist_idxs = np.argsort(ratio_distances)
     best_idx = sorted_dist_idxs[0]
-    # best_pair = all_pairs_of_pairs[best_idx]
     best_corners = sets_of_corners[best_idx]
-
-    # for pair in best_pair:
-    #     for line in pair:
-    #         x1, y1, x2, y2 = line
-    #         plt.plot([x1, x2], [y1,y2], color='red')
-    # for corner in best_corners:
-    #     x = corner[0]
-    #     y = corner[1]
-    #     plt.plot(x, y, 'bo')
-    # plt.imshow(img)
-    # plt.title("TEST CORNERS")
-    # plt.show()
 
     return best_corners
 
@@ -273,7 +233,7 @@ def detect_corners(img):
 
     lines = detect_lines(img)
 
-    proximity_threshold = height * 0.3 if height < width else width * 0.3
+    proximity_threshold = height * 0.4 if height < width else width * 0.4
     unique_lines = filter_unique_lines(lines, proximity_threshold)
 
     if len(unique_lines) < 4:
@@ -347,72 +307,23 @@ def perspective_transform(corners, img):
     warped_img = cv2.warpPerspective(img, transform_matrix, (length, length), flags=cv2.INTER_LINEAR)
 
     warped_pil = Image.fromarray(warped_img)
-    # warped_pil.save('backend/app/test_outputs/output.jpg')
+
     return warped_pil
 
 
-def crop_to_square(image: Image): 
-    pass
-    img_arr = np.array(img)
+def crop_to_square(image: Image):
+    img_arr = np.array(image)
     sharpened_img = sharpen_image(img_arr)
-    bg_removed_img = remove_background(sharpened_img)
-    corners = detect_corners(bg_removed_img)
-    warped_img = perspective_transform(corners, img_arr)
-    return warped_img
+    bg_removed_img = 255*np.uint8(remove_background(sharpened_img) > 150)
+    kernel = np.ones((5, 5), np.uint8)
+    bg_removed_img_dilated = cv2.dilate(bg_removed_img, kernel)
+    corners = detect_corners(bg_removed_img_dilated)
 
-
-
-total_imgs = 0
-correct_imgs = 0
-
-# for filename in glob.glob("backend/app/test_images/*"): 
-for filename in glob.glob("backend/app/working_inputs/*"): 
-# for filename in ['backend/app/test_images/IMG_5415.JPG']:
-# for filename in ['backend/app/test_images/IMG_5359-0049.jpg']:
-# for filename in ['backend/app/test_images/IMG_5348-0001.jpg']:
-# for filename in ['backend/app/test_images/IMG_5353-0013.jpg']:
-# for filename in ['backend/app/test_images/IMG_5356-0036.jpg']:
-# for filename in ['backend/app/working_inputs/IMG_5355-0004.jpg']:
-    total_imgs += 1
-    print("IMAGE: ", filename)
-    img = Image.open(filename)
-    # plt.imshow(img)
-    # plt.title(f"original image: {filename}")
-    # plt.show()
-    img_arr = np.array(img)
-    sharpened_img = sharpen_image(img_arr)
-    # print(type(sharpened_img))
-    # plt.imshow(sharpened_img)
-    # plt.title("sharpened image")
-    # plt.show()
-    bg_removed_img = remove_background(sharpened_img)
-    # print(type(bg_removed_img))
-    # plt.imshow(bg_removed_img)
-    # plt.title("background removed image")
-    # plt.show()
-
-    corners = detect_corners(bg_removed_img)
-    # corners = detect_corners(bg_removed_img)
     if corners is None:
         print("Corners out of bounds")
     else:
         warped_img = perspective_transform(corners, img_arr)
         if warped_img is None:
-            print("Unable to transform image")
-        else:
-            correct_imgs += 1
-            print("Successfully transformed image")
-            idx = len('backend/app/test_images/')
-            new_filename = filename[idx:]
-            # warped_img.save(f"backend/app/test_outputs/output_{new_filename}")
-            # plt.imshow(warped_img)
-            # plt.title("warped image")
-            # plt.show()
+            warped_img = None
 
-print('\n')
-print('Total number of images: ', total_imgs)
-print('Number of correct images: ', correct_imgs)
-
-# img = Image.open('backend/app/test_images/IMG_5352.JPG')
-# bg_removed_img = remove(img)
-# bg_removed_img.save('backend/app/test_outputs/bg_removed.png')
+    return warped_img
