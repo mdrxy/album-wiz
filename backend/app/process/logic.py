@@ -3,12 +3,10 @@ Business logic for the matching process.
 """
 
 import logging
-
 from typing import Dict, List
 from torch import no_grad
 from fastapi import HTTPException, UploadFile
 from app.process.utils import transform_image
-
 
 logger = logging.getLogger(__name__)
 
@@ -54,20 +52,34 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
     Raises:
     - HTTPException: If the database query fails.
     """
+
+    # albums.url AS album_url,
+
     query = """
     SELECT 
         albums.id,
-        albums.title,
-        albums.artist_id,
+        albums.title AS name,
         albums.release_date,
         albums.genres,
-        albums,duration_seconds,
+        albums.duration_seconds AS total_duration,
         albums.cover_image,
         artists.name AS artist_name,
-        1 - (albums.embedding <#> $1) AS similarity
+        1 - (albums.embedding <#> $1) AS similarity,
+        COALESCE(
+            json_agg(
+                json_build_object(
+                    'name', tracks.title,
+                    'duration', tracks.duration_seconds,
+                    'explicit', tracks.explicit
+                )
+            ) FILTER (WHERE tracks.id IS NOT NULL),
+            '[]'
+        ) AS tracks
     FROM albums
     JOIN artists ON albums.artist_id = artists.id
+    LEFT JOIN tracks ON tracks.album_id = albums.id
     WHERE albums.embedding IS NOT NULL
+    GROUP BY albums.id, artists.name
     ORDER BY albums.embedding <#> $1 ASC
     LIMIT $2;
     """
@@ -79,19 +91,24 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
         # Process and format the results
         matched_records = []
         for record in records:
+            # Convert genres "CSV" string to a list
+            genres_list = record["genres"].split(",") if record["genres"] else []
+
+            # Ensure tracks is a list
+            tracks_list = record["tracks"] if isinstance(record["tracks"], list) else []
+
             matched_record = {
+                "name": record["name"],  # Album name
                 "artist_name": record["artist_name"],
-                "album_name": record["title"],
+                "album_name": record["name"],  # Assuming album_name is same as name
+                # "album_url": record["album_url"],
                 "release_date": record["release_date"],
-                "duration": record["duration_seconds"],
+                "genres": genres_list,
+                "total_duration": record["total_duration"],
                 "album_image": record["cover_image"],
                 "similarity": record["similarity"],
+                "tracks": tracks_list,
             }
-
-            # Convert genres "CSV" string to a list
-            matched_record["genres"] = (
-                record["genres"].split(",") if record["genres"] else []
-            )
 
             matched_records.append(matched_record)
 

@@ -184,8 +184,6 @@ docker exec vinyl-nginx nginx -s reload
 - Add Records endpoint
   - Interface for selecting just one DB
   - Resolve
-- Add metadata to init data
-- If falling back, (no corners detected), try matching with just background removed
 
 ### Long-term
 
