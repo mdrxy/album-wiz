@@ -29,6 +29,8 @@ from app.process.logic import vectorize_image, match_vector
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+numba_logger = logging.getLogger("numba")
+numba_logger.setLevel(logging.WARNING)
 logger.info("Initializing backend")
 
 # Torch setup
