@@ -96,7 +96,7 @@ const ImageUploader = () => {
       return `${monthNames[month] || month} ${year}`;
     }
     if (key === "duration") {
-      return formatDuration(value); // Use formatDuration helper
+      return formatDuration(value);
     }
     if (key === "similarity") {
       let color;
@@ -477,7 +477,6 @@ const ImageUploader = () => {
                 <div key={key} style={{ marginBottom: "10px" }}>
                   <span
                     style={{
-                      color: "red",
                       fontWeight: "bold",
                     }}
                   >
@@ -491,7 +490,7 @@ const ImageUploader = () => {
             {/* Total Duration */}
             {responseData.total_duration && (
               <div style={{ marginBottom: "10px" }}>
-                <span style={{ color: "red", fontWeight: "bold" }}>
+                <span style={{ fontWeight: "bold" }}>
                   {matchAttributes["duration"]}:
                 </span>{" "}
                 <span style={{ color: "#444" }}>
