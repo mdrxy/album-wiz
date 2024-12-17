@@ -5,7 +5,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
 
 # Wait for the application to be up and import the CSV file using the API endpoint
 echo "Waiting for the application to be up..."
-until curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8000/api/albums" | grep -q "200"; do
+until curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8000/api/" | grep -q "200"; do
     echo "Application not up yet, retrying in 1 second..."
     sleep 1
 done
