@@ -37,6 +37,7 @@ services:
       - DATABASE_URL
       - REDIS_URL
       - MEDIA_DIR
+      - NUMBA_DEBUG=0
     env_file:
       - .env
     depends_on:
