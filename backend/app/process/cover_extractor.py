@@ -50,7 +50,7 @@ def save_image(image: np.ndarray, filename: str):
         if len(image.shape) == 2:
             image_to_save = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         else:
-            image_to_save = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image_to_save = image
 
         img = Image.fromarray(image_to_save)
         save_path = os.path.join(DEBUGGING_DIR, filename)
@@ -774,14 +774,6 @@ async def extract_album_cover(image: Image.Image) -> Optional[bytes]:
     - Optional[bytes]: The extracted album cover in bytes or None if extraction fails.
     """
     logger.debug("Entering extract_album_cover")
-
-    # for file in os.listdir(DEBUGGING_DIR):
-    #     file_path = os.path.join(DEBUGGING_DIR, file)
-    #     try:
-    #         if os.path.isfile(file_path):
-    #             os.unlink(file_path)
-    #     except OSError as e:
-    #         logger.error("Failed to delete file %s: %s", file_path, e)
 
     cropped_image = crop_to_square(image)
     if cropped_image is None:
