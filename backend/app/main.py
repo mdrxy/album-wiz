@@ -119,7 +119,7 @@ async def upload_image(image: UploadFile = File(...)) -> dict:
 
     try:
         # Step 1: Extract album cover
-        image_pil = Image.open(image.file).convert("RGB")
+        image_pil = Image.open(image.file)
         album_cover_bytes = await extract_album_cover(image_pil)
 
         # Step 2: Fallback to entire image if cover extraction fails
