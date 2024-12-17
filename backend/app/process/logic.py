@@ -59,8 +59,11 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
         albums.id,
         albums.title,
         albums.artist_id,
-        artists.name AS artist_name,
+        albums.release_date,
+        albums.genres,
+        albums,duration_seconds,
         albums.cover_image,
+        artists.name AS artist_name,
         1 - (albums.embedding <#> $1) AS similarity
     FROM albums
     JOIN artists ON albums.artist_id = artists.id
@@ -79,9 +82,17 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
             matched_record = {
                 "artist_name": record["artist_name"],
                 "album_name": record["title"],
+                "release_date": record["release_date"],
+                "duration": record["duration_seconds"],
                 "album_image": record["cover_image"],
                 "similarity": record["similarity"],
             }
+
+            # Convert genres "CSV" string to a list
+            matched_record["genres"] = (
+                record["genres"].split(",") if record["genres"] else []
+            )
+
             matched_records.append(matched_record)
 
         logger.debug("Found %d similar albums.", len(matched_records))

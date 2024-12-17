@@ -50,8 +50,8 @@ const ImageUploader = () => {
   const matchAttributes = {
     artist_name: "Artist",
     album_name: "Release",
-    genres: "Genres",
     release_date: "Released",
+    genres: "Genres",
     total_tracks: "# Tracks",
     duration: "Duration",
     tracks: "Tracks",

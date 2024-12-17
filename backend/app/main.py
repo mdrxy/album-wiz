@@ -21,7 +21,7 @@ from pgvector.asyncpg import register_vector
 from app.metadata_orchestrator import MetadataOrchestrator
 from app.import_albums import import_albums
 from app.process.utils import validate_image, get_image
-from app.process.cover_extractor import extract_album_cover
+from app.process.cover_extractor import extract_album_cover, bg_removal
 from app.process.logic import vectorize_image, match_vector
 
 
@@ -122,6 +122,7 @@ async def upload_image(image: UploadFile = File(...)) -> dict:
         image_pil = Image.open(image.file)
         album_cover_bytes = await extract_album_cover(image_pil)
 
+        extracted = bool(album_cover_bytes)
         # Step 2: Fallback to entire image if cover extraction fails
         if album_cover_bytes is None:
             logger.warning("Album cover not extracted. Falling back to full image.")
@@ -135,6 +136,11 @@ async def upload_image(image: UploadFile = File(...)) -> dict:
                 raise HTTPException(
                     status_code=500, detail="Fallback image is invalid or corrupt."
                 ) from e
+
+        # Optional sub-step: if no album cover is extracted, run background removal instead to pass to vectorization
+        # if not extracted:
+        #     logger.info("No album cover extracted. Running background removal.")
+        #     album_cover_bytes = await bg_removal(image_pil)
 
         # Step 3: Vectorize the image
         image_vector = await vectorize_image(album_cover_bytes, model, img_transform)

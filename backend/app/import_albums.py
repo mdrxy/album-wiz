@@ -10,6 +10,7 @@ Expects columns:
 import logging
 import pandas as pd
 from fastapi import FastAPI
+from datetime import datetime
 
 
 # Configure logging
@@ -43,6 +44,22 @@ async def import_albums(app: FastAPI, csv_file: str) -> None:
         logger.error("Error reading CSV file: %s", e)
         raise ValueError(f"Error reading CSV file: {e}") from e
 
+    # Handle the 'Released' column by adding a default day
+    if "Released" in data.columns:
+
+        def parse_released(date_str):
+            try:
+                # Append '-01' to make it 'YYYY-MM-01'
+                return datetime.strptime(date_str, "%Y-%m").date()
+            except ValueError as ve:
+                logger.error("Error parsing date '%s': %s", date_str, ve)
+                raise ve
+
+        data["Released"] = data["Released"].apply(parse_released)
+    else:
+        logger.error("'Released' column is missing in the CSV.")
+        raise ValueError("'Released' column is missing in the CSV.")
+
     # Insert data into the database
     try:
         async with app.state.pool.acquire() as connection:
@@ -67,13 +84,16 @@ async def import_albums(app: FastAPI, csv_file: str) -> None:
                     # Insert album
                     await connection.execute(
                         """
-                        INSERT INTO albums (title, artist_id, cover_image)
-                        VALUES ($1, $2, $3)
+                        INSERT INTO albums (title, artist_id, cover_image, release_date, genres, duration_seconds)
+                        VALUES ($1, $2, $3, $4, $5, $6)
                         ON CONFLICT DO NOTHING;
                         """,
                         row["Release"],
                         artist_id,
                         row["Ground Truth"],
+                        row["Released"],
+                        row["Genres"],
+                        row["DurationSeconds"],
                     )
                     logger.debug(
                         "Inserted album '%s' by artist '%s'",
