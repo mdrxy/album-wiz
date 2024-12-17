@@ -18,8 +18,9 @@ CREATE TABLE albums (
     id SERIAL PRIMARY KEY,               -- Unique identifier for the album (record ID)
     title VARCHAR(255) UNIQUE NOT NULL,  -- Album title
     artist_id INT NOT NULL,              -- Foreign key to the artist (from the artists table)
-    release_date DATE,                   -- Release date of the album (ignore for now)
-    genre VARCHAR(100),                  -- Genre of the album (ignore for now)
+    release_date DATE,                   -- Release date of the album
+    genres VARCHAR(255),                 -- Genre of the album
+    duration_seconds INT,                -- Total duration of the album in seconds
     cover_image TEXT,                    -- Cover image file path
                                          -- Assuming all containers use /media as the root directory
     embedding VECTOR(256),               -- Vectorized representation for the album (initially empty)
