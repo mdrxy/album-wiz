@@ -9,6 +9,8 @@ import {
   Col,
   Button,
   Image,
+  Dropdown,
+  ButtonGroup,
 } from "react-bootstrap";
 
 const Library = () => {
@@ -18,8 +20,9 @@ const Library = () => {
   const [loadingAlbums, setLoadingAlbums] = useState(true);
   const [errorArtists, setErrorArtists] = useState(null);
   const [errorAlbums, setErrorAlbums] = useState(null);
-  const [deletingAlbum, setDeletingAlbum] = useState(false);
+  const [deletingAlbums, setDeletingAlbums] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [selectedAlbums, setSelectedAlbums] = useState([]);
 
   // Fetch Artists
   useEffect(() => {
@@ -59,25 +62,48 @@ const Library = () => {
     fetchAlbums();
   }, []);
 
-  // Delete Album
-  const deleteAlbum = async (albumId) => {
-    if (deletingAlbum) return; // Prevent multiple simultaneous deletions
-    setDeletingAlbum(true);
+  // Delete Selected Albums
+  const deleteSelectedAlbums = async () => {
+    if (deletingAlbums || selectedAlbums.length === 0) return;
+    setDeletingAlbums(true);
     setDeleteError(null);
     try {
-      await axios.delete(`/album/${albumId}`);
-      setAlbums((prevAlbums) =>
-        prevAlbums.filter((album) => album.id !== albumId)
+      await Promise.all(
+        selectedAlbums.map((albumId) => axios.delete(`/album/${albumId}`))
       );
+      setAlbums((prevAlbums) =>
+        prevAlbums.filter((album) => !selectedAlbums.includes(album.id))
+      );
+      setSelectedAlbums([]);
 
       // Refetch artists to ensure the UI reflects any artist deletions
       const response = await axios.get("/db/artists");
       setArtists(response.data);
     } catch (error) {
-      console.error("Error deleting album:", error);
-      setDeleteError(error.response?.data?.detail || "Failed to delete album.");
+      console.error("Error deleting albums:", error);
+      setDeleteError(
+        error.response?.data?.detail || "Failed to delete selected albums."
+      );
     } finally {
-      setDeletingAlbum(false);
+      setDeletingAlbums(false);
+    }
+  };
+
+  // Handle Individual Album Selection
+  const handleSelectAlbum = (albumId) => {
+    setSelectedAlbums((prevSelected) =>
+      prevSelected.includes(albumId)
+        ? prevSelected.filter((id) => id !== albumId)
+        : [...prevSelected, albumId]
+    );
+  };
+
+  // Handle Select All
+  const handleSelectAll = () => {
+    if (selectedAlbums.length === albums.length) {
+      setSelectedAlbums([]);
+    } else {
+      setSelectedAlbums(albums.map((album) => album.id));
     }
   };
 
@@ -121,13 +147,43 @@ const Library = () => {
           ) : (
             <>
               {deleteError && <Alert variant="danger">{deleteError}</Alert>}
+              <div className="d-flex justify-content-between mb-2">
+                <div>
+                  <Dropdown as={ButtonGroup}>
+                    <Button
+                      variant="danger"
+                      onClick={deleteSelectedAlbums}
+                      disabled={selectedAlbums.length === 0 || deletingAlbums}
+                    >
+                      {deletingAlbums ? "Deleting..." : "Delete Selected"}
+                    </Button>
+                    {/* Future actions can be added here */}
+                  </Dropdown>
+                </div>
+                <div>
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={handleSelectAll}
+                  >
+                    {selectedAlbums.length === albums.length
+                      ? "Deselect All"
+                      : "Select All"}
+                  </Button>
+                </div>
+              </div>
               <Table striped bordered hover responsive>
                 <thead>
                   <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        checked={selectedAlbums.length === albums.length}
+                        onChange={handleSelectAll}
+                      />
+                    </th>
                     <th>Cover</th>
                     <th>Title</th>
-                    <th>Artist</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -137,6 +193,13 @@ const Library = () => {
                     );
                     return (
                       <tr key={album.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedAlbums.includes(album.id)}
+                            onChange={() => handleSelectAlbum(album.id)}
+                          />
+                        </td>
                         <td>
                           <Image
                             src={
@@ -149,17 +212,6 @@ const Library = () => {
                           />
                         </td>
                         <td>{album.title}</td>
-                        <td>{artist ? artist.name : "Unknown Artist"}</td>
-                        <td>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => deleteAlbum(album.id)}
-                            disabled={deletingAlbum}
-                          >
-                            {deletingAlbum ? "Deleting..." : "Delete"}
-                          </Button>
-                        </td>
                       </tr>
                     );
                   })}
