@@ -2,7 +2,6 @@
 Fetch metadata from the Discogs API.
 """
 
-import logging
 import os
 import re
 from dotenv import load_dotenv
@@ -74,15 +73,12 @@ class DiscogsCollector(MetadataCollector):
 
     def __init__(self, name: str):
         super().__init__(name)
-        logging.basicConfig(level=logging.DEBUG)
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
         self.logger.info("Initializing DiscogsCollector")
 
         self.client = discogs_client.Client(USER_AGENT, user_token=TOKEN)
         self.logger.info("Discogs client initialized")
 
-    def fetch_artist_details(self, artist_name: str) -> dict:
+    async def fetch_artist_details(self, artist_name: str) -> dict:
         """
         Fetch artist details from the Discogs API.
 
@@ -173,7 +169,7 @@ class DiscogsCollector(MetadataCollector):
             return min(release_dates)
         return None
 
-    def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
+    async def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
         """
         Fetch album details from the Discogs API.
 
@@ -300,37 +296,3 @@ class DiscogsCollector(MetadataCollector):
         album_details["tracks"] = tracks
 
         return album_details
-
-    async def fetch_metadata(self, query: str) -> dict:
-        """
-        Retrieve metadata for a given album query from the Discogs API.
-
-        Parameters:
-        - query (str): The query to search for, in the format:
-            "{artist name} - {album name}".
-
-        Returns:
-        - dict: A dictionary containing the metadata for the given query.
-
-        Raises:
-        - ValueError: If the query format is invalid.
-        """
-        self.logger.debug("Fetching Discogs metadata for query: %s", query)
-
-        try:
-            artist_name, album_name = query.split(" - ", 1)
-        except ValueError:
-            self.logger.error(
-                "Query format is invalid. Expected format: '{artist name} - {album name}'"
-            )
-            return {}
-
-        artist_details = self.fetch_artist_details(artist_name)
-        album_details = self.fetch_album_details(artist_name, album_name)
-
-        metadata = {
-            "artist": artist_details,
-            "album": album_details if album_details else None,
-        }
-        self.logger.debug("Discogs metadata fetched: %s", metadata)
-        return metadata

@@ -1,8 +1,7 @@
 """
-This module contains the MusicBrainzCollector class that fetches metadata from the MusicBrainz API.
+Fetch metadata from the MusicBrainz API.
 """
 
-import logging
 import os
 from dotenv import load_dotenv
 import musicbrainzngs  # https://python-musicbrainzngs.readthedocs.io/en/v0.7.1/
@@ -15,9 +14,6 @@ USER_AGENT = os.getenv("MUSICBRAINZ_USER_AGENT_NAME")
 VERSION = os.getenv("MUSICBRAINZ_USER_AGENT_VERSION")
 CONTACT = os.getenv("MUSICBRAINZ_USER_AGENT_CONTACT")
 
-# Initialize the MusicBrainz client
-musicbrainzngs.set_useragent(USER_AGENT, VERSION, CONTACT)
-
 
 class MusicBrainzCollector(MetadataCollector):
     """
@@ -29,16 +25,22 @@ class MusicBrainzCollector(MetadataCollector):
 
     def __init__(self, name: str):
         super().__init__(name)
-        logging.basicConfig(level=logging.DEBUG)
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.info("Initializing MusicBrainzCollector")
+
+        musicbrainzngs.set_useragent(USER_AGENT, VERSION, CONTACT)
         self.logger.info("MusicBrainzCollector initialized")
 
     def get_genre_list(self) -> set:
         """
         Retrieve the official list of genres from MusicBrainz.
+
+        Assumes the genres.txt file is in the collectors directory.
+
         Returns:
-            A set of genre names in lowercase.
+        - set: Genre names (in lowercase).
+
+        Raises:
+        - FileNotFoundError: If the genres.txt file is not found.
         """
         try:
             with open("/app/app/collectors/genres.txt", "r", encoding="utf-8") as file:
@@ -56,13 +58,15 @@ class MusicBrainzCollector(MetadataCollector):
 
         Returns:
         - str: URL to the artist's image if available, None otherwise.
+
+        Raises:
+        - musicbrainzngs.WebServiceError: If there is an error fetching the artist's relationships.
         """
         try:
-            # Fetch detailed artist information, including URL relationships
             artist_info = musicbrainzngs.get_artist_by_id(
                 artist_data["id"], includes=["url-rels"]
             )
-            # Find Wikimedia Commons URL
+
             commons_url = None
             for rel in artist_info["artist"].get("url-relation-list", []):
                 self.logger.debug("Found URL: %s", rel["target"])
@@ -74,7 +78,6 @@ class MusicBrainzCollector(MetadataCollector):
                 return None
 
             # Fetch image from Wikimedia Commons
-            # TODO: this should probably not be here, but instead a new method elsewhere
             image_url = fetch_wikimedia_image(commons_url)
             return image_url
 
@@ -84,7 +87,16 @@ class MusicBrainzCollector(MetadataCollector):
 
     def get_english_aliases(self, artist_data) -> list:
         """
-        Extract English aliases from the artist data.
+        Extract English aliases from artist data.
+
+        Parameters:
+        - artist_data (dict): The artist data from the MusicBrainz API.
+
+        Returns:
+        - list: A list of English aliases for the artist.
+
+        Raises:
+        - KeyError: If there is an error extracting the aliases.
         """
         self.logger.debug(
             "Extracting English aliases from artist data: %s", artist_data
@@ -101,20 +113,32 @@ class MusicBrainzCollector(MetadataCollector):
             self.logger.error("KeyError while extracting aliases: %s", e, exc_info=True)
             return []
 
-    def fetch_artist_details(self, artist_name: str) -> dict:
+    async def fetch_artist_details(self, artist_name: str) -> dict:
         """
-        - "name": The name of the artist
-        - "namevariations": A list of name variations for the artist
-            - Example: ["The Beatles", "Beatles"]
-        - "genres": A list of genres associated with the artist
-            - Returns the top 5
-            - Example: ["pop", "rock"]
-        - "image": URL to an image of the artist
-            - Should be the highest quality image available
-        - "url": URL to the artist's page on the source website
-        - "popularity": A popularity score for the artist
-            - Should be a number between 0 and 100
-        - "profile": A brief description of the artist (HTML)
+        Fetch artist details from the MusicBrainz API.
+
+        Parameters:
+        - artist_name (str): The name of the artist to search for.
+
+        Returns:
+        - dict: A dictionary containing the artist details:
+            - "name": The name of the artist
+            - "namevariations": A list of name variations for the artist
+                - Example: ["The Beatles", "Beatles"]
+            - "genres": A list of genres associated with the artist
+                - Returns the top 5
+                - Example: ["pop", "rock"]
+            - "image": URL to an image of the artist
+                - Should be the highest quality image available
+            - "url": URL to the artist's page on the source website
+            - "popularity": A popularity score for the artist
+                - Should be a number between 0 and 100
+            - "profile": A brief description of the artist (HTML)
+
+        If a value is not available, it should be set to None.
+
+        Raises:
+        - musicbrainzngs.WebServiceError: If there is an error fetching the artist details.
         """
         self.logger.info("Fetching MusicBrainz details for artist: %s", artist_name)
 
@@ -173,11 +197,14 @@ class MusicBrainzCollector(MetadataCollector):
         """
         Fetch the cover art URL for a given album using the Cover Art Archive.
 
-        Args:
+        Parameters:
         - release_data (dict): The release data from the MusicBrainz API.
 
         Returns:
         - str: URL to the album's cover art image if available, None otherwise.
+
+        Raises:
+        - musicbrainzngs.WebServiceError: If there is an error fetching the cover art.
         """
         try:
             release_mbid = release_data["id"]
@@ -196,28 +223,42 @@ class MusicBrainzCollector(MetadataCollector):
             self.logger.error("Error fetching cover art: %s", str(e))
             return None
 
-    def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
+    async def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
         """
-        - "name": The name of the album
-        - "genres": A list of genres associated with the album
-            - Returns the top 5
-            - Example: ["pop", "rock"]
-        - "image": URL to an image of the album
-            - Should be the highest quality image available
-        - "release_date": The release date of the album
-            - Should be in the format: "YYYY-MM"
-        - "total_tracks": The total number of tracks on the album
-        - "tracks": A list of tracks
-            - Each track should be a dictionary with the following keys:
-                - "name": The name of the track
-                - "duration": The duration of the track in seconds
-                - "explicit": True if the track is explicit, False otherwise
-                    - None if the information is not available
-        - "url": URL to the album's page on the source website
+        Fetch album details from the MusicBrainz API.
+
+        Parameters:
+        - artist_name (str): The name of the artist who released the album.
+        - album_name (str): The name of the album to fetch details for.
+
+        Returns:
+        - dict: A dictionary containing the album details:
+            - "name": The name of the album
+            - "genres": A list of genres associated with the album
+                - Returns the top 5
+                - Example: ["pop", "rock"]
+            - "image": URL to an image of the album
+                - Should be the highest quality image available
+            - "release_date": The release date of the album
+                - Should be in the format: "YYYY-MM"
+            - "total_tracks": The total number of tracks on the album
+            - "tracks": A list of tracks
+                - Each track should be a dictionary with the following keys:
+                    - "name": The name of the track
+                    - "duration": The duration of the track in seconds
+                    - "explicit": True if the track is explicit, False otherwise
+                        - None if the information is not available
+            - "url": URL to the album's page on the source website
+
+        If a value is not available, it should be set to None.
+
+        Raises:
+        - musicbrainzngs.WebServiceError: If there is an error fetching the album details.
         """
         self.logger.info(
             "Fetching MusicBrainz album: '%s' by artist: '%s'", album_name, artist_name
         )
+
         try:
             result = musicbrainzngs.search_releases(
                 artist=artist_name, release=album_name, limit=1
@@ -277,27 +318,3 @@ class MusicBrainzCollector(MetadataCollector):
             self.logger.error("Error fetching tracklist: %s", str(e))
 
         return album_details
-
-    async def fetch_metadata(self, query: str) -> dict:
-        """
-        Retrieve metadata for a given album or artist query from the MusicBrainz API.
-        """
-        self.logger.debug("Fetching MusicBrainz metadata for query: %s", query)
-
-        try:
-            artist_name, album_name = query.split(" - ", 1)
-        except ValueError:
-            self.logger.error(
-                "Query format is invalid. Expected format: '{artist name} - {album name}'"
-            )
-            return {}
-
-        artist_details = self.fetch_artist_details(artist_name)
-        album_details = self.fetch_album_details(artist_name, album_name)
-
-        metadata = {
-            "artist": artist_details,
-            "album": album_details if album_details else None,
-        }
-        self.logger.debug("MusicBrainz metadata fetched: %s", metadata)
-        return metadata

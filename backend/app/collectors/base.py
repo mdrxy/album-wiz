@@ -2,6 +2,7 @@
 Abstract base class for metadata collectors.
 """
 
+import logging
 from abc import ABC, abstractmethod
 
 
@@ -16,6 +17,11 @@ class MetadataCollector(ABC):
     def __init__(self, name: str):
         self.name = name
 
+        logging.basicConfig(level=logging.DEBUG)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.info("Initializing %s", self.__class__.__name__)
+
     def get_name(self) -> str:
         """
         Get the name or identifier of the metadata collector.
@@ -26,6 +32,17 @@ class MetadataCollector(ABC):
         return self.name
 
     @abstractmethod
+    async def fetch_artist_details(self, artist_name: str) -> dict:
+        """
+        Fetch artist details. To be implemented by subclasses.
+        """
+
+    @abstractmethod
+    async def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
+        """
+        Fetch album details. To be implemented by subclasses.
+        """
+
     async def fetch_metadata(self, query: str) -> dict:
         """
         Fetch metadata for a given record.
@@ -80,4 +97,44 @@ class MetadataCollector(ABC):
         Examples:
         - fetch_metadata("The Beatles - Abbey Road")
         """
-        # TODO: put the others here
+        self.logger.info("Fetching metadata for query: '%s'", query)
+
+        # Parse the query
+        try:
+            artist_name, album_name = query.split(" - ", 1)
+            artist_name = artist_name.strip()
+            album_name = album_name.strip()
+            self.logger.debug(
+                "Parsed query into artist: '%s', album: '%s'", artist_name, album_name
+            )
+        except ValueError:
+            error_message = (
+                "Invalid query format. Expected format: '{artist name} - {album name}'"
+            )
+            self.logger.error("%s Query: '%s'", error_message, query)
+            return {"error": error_message}
+
+        # Fetch artist details
+        artist_details = await self.fetch_artist_details(artist_name)
+        if "error" in artist_details:
+            self.logger.error(
+                "Error fetching artist details: %s", artist_details["error"]
+            )
+            return {"error": artist_details["error"]}
+
+        # Fetch album details
+        album_details = await self.fetch_album_details(artist_name, album_name)
+        if "error" in album_details:
+            self.logger.error(
+                "Error fetching album details: %s", album_details["error"]
+            )
+            return {"error": album_details["error"]}
+
+        # Compile metadata
+        metadata = {
+            "artist": artist_details,
+            "album": album_details,
+        }
+
+        self.logger.info("Successfully fetched metadata for query: '%s'", query)
+        return metadata

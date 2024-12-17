@@ -55,19 +55,23 @@ class MetadataOrchestrator:
                 "Collecting metadata using %s", collector.__class__.__name__
             )
             source_metadata = await collector.fetch_metadata(query)
-            if "error" not in source_metadata:
+            self.logger.debug(
+                "Metadata from %s: %s", collector.__class__.__name__, source_metadata
+            )
+            if source_metadata and "error" not in source_metadata:
                 metadata[collector.get_name()] = source_metadata
                 self.logger.info(
                     "Successfully collected metadata from %s",
                     collector.__class__.__name__,
                 )
             else:
+                error = source_metadata.get("error", "Unknown error occurred")
                 self.logger.warning(
                     "Error in metadata from %s: %s",
                     collector.__class__.__name__,
-                    source_metadata["error"],
+                    error,
                 )
-                metadata["error"] = source_metadata["error"]
+                metadata["error"] = error
         except (ConnectionError, TimeoutError, ValueError) as e:
             error_message = str(e)
             metadata["error"] = error_message
