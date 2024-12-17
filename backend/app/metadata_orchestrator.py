@@ -1,7 +1,6 @@
 """
-This module contains the MetadataOrchestrator class that is responsible for
-orchestrating the metadata collection process by delegating the metadata
-collection to the respective collectors.
+Responsible for orchestrating the metadata collection process by delegating the metadata collection 
+to the respective collectors.
 """
 
 import logging
@@ -12,15 +11,13 @@ from app.collectors.musicbrainz import MusicBrainzCollector
 
 class MetadataOrchestrator:
     """
-    Orchestrates the metadata collection process by delegating the metadata
-    collection to the respective collectors.
+    Parent class for the MetadataOrchestrator.
     """
 
     def __init__(self):
         logging.basicConfig(level=logging.DEBUG)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-        self.logger.info("MetadataOrchestrator initialized")
 
         self.collectors = [
             SpotifyCollector("spotify"),
@@ -32,12 +29,20 @@ class MetadataOrchestrator:
         """
         Collect metadata for a given album or artist query using a specific collector.
 
-        Args:
+        Parameters:
         - source (str): The name of the collector to use.
         - query (str): The query to search for, in the format: "{artist} - {album}".
 
         Returns:
         - dict: A dictionary containing the metadata from the specified collector.
+
+        Raises:
+        - ConnectionError: If there is an error connecting to the collector API.
+        - TimeoutError: If there is a timeout connecting to the collector API.
+        - ValueError: If the collector is not found.
+
+        Example:
+        - collect_metadata("spotify", "The Beatles - Abbey Road")
         """
         metadata = {}
         collector = next((c for c in self.collectors if c.get_name() == source), None)

@@ -6,53 +6,31 @@ import logging
 
 from typing import Dict, List
 from torch import no_grad
-from fastapi import File, UploadFile, HTTPException
-from app.process.utils import validate_image, transform_image
+from fastapi import HTTPException, UploadFile
+from app.process.utils import transform_image
 
 
 logger = logging.getLogger(__name__)
 
 
-async def extract_album_cover(image: UploadFile = File(...)) -> bytes:
+async def vectorize_image(image: UploadFile, model, img_transform) -> list:
     """
-    Extracts the album cover from an image file.
-
-    Args:
-    - image (UploadFile): The image file to extract the album cover from.
-
-    Returns:
-    - bytes: The extracted album cover image.
-
-    Raises:
-    - HTTPException: If the image file is not valid.
-    """
-    # Validate the image file
-    await validate_image(image)
-
-    # Extract the album cover
-    # This is a placeholder implementation
-    # The actual implementation would use a machine learning model to extract the album cover
-    # For now, we will return the image as is
-    return await image.read()
-
-
-async def vectorize_image(image: bytes, model, img_transform) -> list:
-    """
-    Given an image file, vectorizes it using a pre-trained model (following the specified transformation).
+    Given an image file, vectorizes it using a pre-trained model
+    (following the specified transformation).
 
     Parameters:
-    - image (bytes): The image file to vectorize.
+    - image (UploadFile): The image file to vectorize.
     - model: The pre-trained model to use for vectorization.
     - img_transform: The image transformation to apply before vectorization.
 
     Returns:
     - list: The vectorized image representation.
     """
+    # image = image.file.read()
     tensor_image = transform_image(image, img_transform)
     # Ensure the tensor is on the same device as the model
     tensor_image = tensor_image.to(next(model.parameters()).device)
 
-    # Perform vectorization
     with no_grad():  # Disable gradient computation for inference
         vector = (
             model(tensor_image).squeeze(0).cpu().numpy()
@@ -65,16 +43,16 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
     """
     Finds the top-n most similar album records based on the provided image vector.
 
-    Args:
-        image_vector (List[float]): The vector representation of the uploaded image.
-        n (int): The number of similar records to retrieve.
-        connection: An active asyncpg database connection.
+    Parameters:
+    - image_vector (List[float]): The vector representation of the uploaded image.
+    - n (int): The number of similar records to retrieve.
+    - connection: An active asyncpg database connection.
 
     Returns:
-        List[Dict]: A list of dictionaries containing album metadata and similarity scores.
+    - List[Dict]: A list of dictionaries containing album metadata and similarity scores.
 
     Raises:
-        HTTPException: If the database query fails.
+    - HTTPException: If the database query fails.
     """
     query = """
     SELECT 

@@ -9,7 +9,10 @@ import requests
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logger.info("Wikimedia collector initialized")
+
+
+# Wikimedia Commons API endpoint
+API = "https://commons.wikimedia.org/w/api.php"
 
 
 def fetch_wikimedia_image(commons_url: str) -> str:
@@ -21,17 +24,21 @@ def fetch_wikimedia_image(commons_url: str) -> str:
 
     Returns:
     - str: URL to the image if available, None otherwise.
+
+    Raises:
+    - requests.RequestException: If an error occurs while fetching the image.
+
+    Example:
+    - Input: "https://commons.wikimedia.org/wiki/File:Example.jpg"
+        -> "https://upload.wikimedia.org/wikipedia/commons/0/0c/Example.jpg"
     """
     try:
-        # Wikimedia Commons API endpoint
-        api_url = "https://commons.wikimedia.org/w/api.php"
-
         # Extract page title from the URL
         page_title = commons_url.split("/")[-1]
 
         # Make a request to the Wikimedia Commons API to get the file information
         response = requests.get(
-            api_url,
+            API,
             params={
                 "action": "query",
                 "titles": page_title,

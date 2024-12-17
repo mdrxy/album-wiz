@@ -1,12 +1,12 @@
 """
-This module contains the DiscogsCollector class that fetches metadata from the Discogs API.
+Fetch metadata from the Discogs API.
 """
 
 import logging
 import os
 import re
-import discogs_client  # https://github.com/joalla/discogs_client
 from dotenv import load_dotenv
+import discogs_client  # https://github.com/joalla/discogs_client
 from app.collectors.base import MetadataCollector
 
 
@@ -15,12 +15,21 @@ USER_AGENT = os.getenv("DISCOGS_USER_AGENT")
 TOKEN = os.getenv("DISCOGS_TOKEN")
 
 
-def discogs_to_html(text):
+def discogs_to_html(text: str) -> str:
     """
     Convert Discogs-style text to HTML.
+
+    Parameters:
+    - text (str): The text to convert.
+
+    Returns:
+    - str: The converted text in HTML format.
+
+    Example:
+    - discogs_to_html("[url=https://www.discogs.com/artist/123]Artist[/url]")
+        -> '<a href="https://www.discogs.com/artist/123">Artist</a>'
     """
-    # Convert newlines
-    text = text.replace("\r\n", "<br>")
+    text = text.replace("\r\n", "<br>")  # Newlines
 
     # Convert [url=...]...[/url] to <a href="...">...</a>
     text = re.sub(r"\[url=([^\]]+)\](.*?)\[/url\]", r'<a href="\1">\2</a>', text)
@@ -35,7 +44,7 @@ def discogs_to_html(text):
         r"\[r=([^\]]+)\]", r'<a href="https://www.discogs.com/release/\1">\1</a>', text
     )
 
-    # Wrap sections like "Band members:" in <strong> tags
+    # Bold sections like "Band members:"
     text = re.sub(
         r"^(Band members:|Current live members:|Former members:|Previous names:)",
         r"<strong>\1</strong>",
@@ -43,9 +52,7 @@ def discogs_to_html(text):
         flags=re.MULTILINE,
     )
 
-    # Standardize hyphens
-    text = text.replace("–", "-")
-
+    text = text.replace("–", "-")  # Standardize hyphens
     return text
 
 
@@ -77,18 +84,30 @@ class DiscogsCollector(MetadataCollector):
 
     def fetch_artist_details(self, artist_name: str) -> dict:
         """
-        - "name": The name of the artist
-        - "namevariations": A list of name variations for the artist
-            - Example: ["The Beatles", "Beatles"]
-        - "genres": A list of genres associated with the artist
-            - Returns the top 5
-            - Example: ["pop", "rock"]
-        - "image": URL to an image of the artist
-            - Should be the highest quality image available
-        - "url": URL to the artist's page on the source website
-        - "popularity": A popularity score for the artist
-            - Should be a number between 0 and 100
-        - "profile": A brief description of the artist (HTML)
+        Fetch artist details from the Discogs API.
+
+        Parameters:
+        - artist_name (str): The name of the artist to search for.
+
+        Returns:
+        - dict: A dictionary containing the artist details:
+            - "name": The name of the artist
+            - "namevariations": A list of name variations for the artist
+                - Example: ["The Beatles", "Beatles"]
+            - "genres": A list of genres associated with the artist
+                - Returns the top 5
+                - Example: ["pop", "rock"]
+            - "image": URL to an image of the artist
+                - Should be the highest quality image available
+            - "url": URL to the artist's page on the source website
+            - "popularity": A popularity score for the artist
+                - Should be a number between 0 and 100
+            - "profile": A brief description of the artist (HTML)
+
+        If a value is not available, it should be set to None.
+
+        Raises:
+        - discogs_client.exceptions.HTTPError: If an error occurs while fetching the artist details.
         """
         self.logger.info("Fetching Discogs details for artist: %s", artist_name)
 
@@ -128,6 +147,19 @@ class DiscogsCollector(MetadataCollector):
     def find_release_date(self, releases: list) -> str:
         """
         Find the release date of the earliest release in a list of releases.
+        Append "-01" to the year to convert it to the format "YYYY-MM".
+
+        Parameters:
+        - releases (list): A list of discogs_client.models.Release objects.
+
+        Returns:
+        - str: The release date of the earliest release in the format "YYYY-MM".
+
+        If no release date is found, return None.
+
+        Example:
+        - find_release_date([<Release year=2000>, <Release year=1999>])
+            -> "1999-01"
         """
         release_dates = []
         for release in releases:
@@ -143,26 +175,40 @@ class DiscogsCollector(MetadataCollector):
 
     def fetch_album_details(self, artist_name: str, album_name: str) -> dict:
         """
-        - "name": The name of the album
-        - "genres": A list of genres associated with the album
-            - Returns the top 5
-            - Example: ["pop", "rock"]
-        - "image": URL to an image of the album
-            - Should be the highest quality image available
-        - "release_date": The release date of the album
-            - Should be in the format: "YYYY-MM"
-        - "total_tracks": The total number of tracks on the album
-        - "tracks": A list of tracks
-            - Each track should be a dictionary with the following keys:
-                - "name": The name of the track
-                - "duration": The duration of the track in seconds
-                - "explicit": True if the track is explicit, False otherwise
-                    - None if the information is not available
-        - "url": URL to the album's page on the source website
+        Fetch album details from the Discogs API.
+
+        Parameters:
+        - artist_name (str): The name of the artist who released the album.
+        - album_name (str): The name of the album to fetch details for.
+
+        Returns:
+        - dict: A dictionary containing the album details:
+            - "name": The name of the album
+            - "genres": A list of genres associated with the album
+                - Returns the top 5
+                - Example: ["pop", "rock"]
+            - "image": URL to an image of the album
+                - Should be the highest quality image available
+            - "release_date": The release date of the album
+                - Should be in the format: "YYYY-MM"
+            - "total_tracks": The total number of tracks on the album
+            - "tracks": A list of tracks
+                - Each track should be a dictionary with the following keys:
+                    - "name": The name of the track
+                    - "duration": The duration of the track in seconds
+                    - "explicit": True if the track is explicit, False otherwise
+                        - None if the information is not available
+            - "url": URL to the album's page on the source website
+
+        If a value is not available, it should be set to None.
+
+        Raises:
+        - discogs_client.exceptions.HTTPError: If an error occurs while fetching the album details.
         """
         self.logger.info(
             "Fetching Discogs album: '%s' by artist: '%s'", album_name, artist_name
         )
+
         try:
             results = self.client.search(album_name, type="release", artist=artist_name)
         except discogs_client.exceptions.HTTPError as e:
@@ -257,7 +303,17 @@ class DiscogsCollector(MetadataCollector):
 
     async def fetch_metadata(self, query: str) -> dict:
         """
-        Retrieve metadata for a given album or artist query from the Discogs API.
+        Retrieve metadata for a given album query from the Discogs API.
+
+        Parameters:
+        - query (str): The query to search for, in the format:
+            "{artist name} - {album name}".
+
+        Returns:
+        - dict: A dictionary containing the metadata for the given query.
+
+        Raises:
+        - ValueError: If the query format is invalid.
         """
         self.logger.debug("Fetching Discogs metadata for query: %s", query)
 
