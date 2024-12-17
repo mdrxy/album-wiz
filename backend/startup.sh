@@ -4,7 +4,7 @@
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
 
 # Wait for the application to be up (adjust sleep duration if needed)
-sleep 8
+sleep 15
 
 # Import the CSV file using the API endpoint
 echo "Starting prelim data import via API..."
