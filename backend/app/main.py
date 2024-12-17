@@ -172,7 +172,6 @@ async def upload_album(data: dict) -> dict:
     """
     Endpoint to receive album metadata and store it in the database.
 
-    # TODO: refactor into artist, album keys and subkeys
     Parameters:
     - data (dict): Album metadata to store in the database.
         - artist_name (str): Name of the artist.

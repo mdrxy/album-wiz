@@ -5,7 +5,11 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE artists (
     id SERIAL PRIMARY KEY,               -- Unique identifier for the artist
     name VARCHAR(255) UNIQUE NOT NULL,   -- Artist name
-    genre VARCHAR(100),                  -- Genre of the artist
+    name_vars VARCHAR(255),              -- Artist name variations
+    genres VARCHAR(100),                 -- Genres of the artist
+    popularity INT,                      -- Artist popularity
+    artist_url TEXT,                     -- URL to the artist page on the streaming platform
+    a_profile TEXT,                        -- Artist profile (paragraph or bio)
     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
     updated_at TIMESTAMP DEFAULT NOW()   -- Last updated timestamp
 );

@@ -471,9 +471,9 @@ const MetadataManager = () => {
                 <p>None</p>
               ) : (
                 <div>
-                  {val.map((genre, i) => (
+                  {val.map((genres, i) => (
                     <Badge bg="secondary" className="me-2" key={i}>
-                      {genre}
+                      {genres}
                     </Badge>
                   ))}
                 </div>
