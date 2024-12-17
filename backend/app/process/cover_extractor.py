@@ -763,6 +763,49 @@ def crop_to_square(image: Image.Image) -> Optional[Image.Image]:
         return None
 
 
+async def bg_removal(image: Image.Image) -> Optional[Image.Image]:
+    """
+    Remove the background from an image using the rembg library.
+
+    Parameters:
+    - image (Image.Image): The input PIL Image.
+
+    Returns:
+    - Optional[Image.Image]: The background-removed image or None if removal fails.
+    """
+    logger.debug("Entering bg_removal")
+    try:
+        img_arr = np.array(image)
+        logger.debug("Converted PIL image to numpy array.")
+        save_image(img_arr, "1-original_image.png")
+
+        sharpened_img = sharpen_image(img_arr)
+        logger.debug("Image sharpened.")
+
+        bg_removed_img = 255 * np.uint8(remove_background(sharpened_img) > 150)
+        kernel = np.ones((5, 5), np.uint8)
+        bg_removed_img_dilated = cv2.dilate(bg_removed_img, kernel)
+        if bg_removed_img_dilated is None:
+            logger.error("Background removal failed.")
+            return None
+        logger.debug("Background removed from image.")
+        save_image(bg_removed_img_dilated, "2-1-background_removed.png")
+
+        bg_removed_img_dilated_pil = Image.fromarray(bg_removed_img_dilated)
+        logger.info("Background removed successfully.")
+        logger.debug("Exiting bg_removal")
+
+        with BytesIO() as output:
+            bg_removed_img_dilated_pil.save(output, format="PNG")
+            bg_removed_img_bytes = output.getvalue()
+        logger.debug("Album cover converted to bytes successfully.")
+        logger.debug("Exiting bg_removal")
+        return bg_removed_img_bytes
+    except (ValueError, TypeError, RuntimeError) as e:
+        logger.exception("Failed to remove background: %s", e)
+        return None
+
+
 async def extract_album_cover(image: Image.Image) -> Optional[bytes]:
     """
     Extract the album cover from an image.
