@@ -3,6 +3,7 @@ Business logic for the matching process.
 """
 
 import logging
+import json
 from typing import Dict, List
 from torch import no_grad
 from fastapi import HTTPException, UploadFile
@@ -53,13 +54,12 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
     - HTTPException: If the database query fails.
     """
 
-    # albums.url AS album_url,
-
     query = """
     SELECT 
         albums.id,
         albums.title AS name,
         albums.release_date,
+        albums.album_url AS album_url,
         albums.genres,
         albums.duration_seconds AS total_duration,
         albums.cover_image,
@@ -94,13 +94,17 @@ async def match_vector(image_vector: List[float], n: int, connection) -> List[Di
             # Convert genres "CSV" string to a list
             genres_list = record["genres"].split(",") if record["genres"] else []
 
-            # Ensure tracks is a list
-            tracks_list = record["tracks"] if isinstance(record["tracks"], list) else []
+            # Ensure tracks is parsed as a proper list
+            tracks_list = (
+                json.loads(record["tracks"])
+                if isinstance(record["tracks"], str)
+                else []
+            )
 
             matched_record = {
-                "album_name": record["name"],  # Album name
+                "album_name": record["name"],
                 "artist_name": record["artist_name"],
-                # "album_url": record["album_url"],
+                "album_url": record["album_url"],
                 "release_date": record["release_date"],
                 "genres": genres_list,
                 "total_duration": record["total_duration"],

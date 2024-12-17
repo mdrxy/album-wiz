@@ -85,8 +85,8 @@ async def import_albums(app: FastAPI, csv_file: str) -> None:
                     await connection.execute(
                         """
                         INSERT INTO albums (title, artist_id, cover_image, release_date, album_url, genres, duration_seconds)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                        ON CONFLICT DO NOTHING;
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        ON CONFLICT (title) DO NOTHING;
                         """,
                         row["Release"],
                         artist_id,
