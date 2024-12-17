@@ -173,7 +173,7 @@ const Library = () => {
   };
 
   return (
-    <Container className="mt-4">
+    <Container className="mt-4" style={{ paddingBottom: "50px" }}>
       <h2 className="text-center mb-4">Library</h2>
       <Row>
         <Col md={6}>

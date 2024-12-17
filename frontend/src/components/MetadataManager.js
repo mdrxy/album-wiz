@@ -517,7 +517,7 @@ const MetadataManager = () => {
   };
 
   return (
-    <Container>
+    <Container style={{ paddingBottom: "50px" }}>
       <h2 className="mb-4 text-center">Add Record</h2>
       <Form
         onSubmit={(e) => {
