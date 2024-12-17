@@ -419,7 +419,10 @@ async def vectorize_albums() -> dict:
                         "Image retrieved successfully for album ID %d.", album_id
                     )
 
-                    image_vector = await vectorize_image(image, model, img_transform)
+                    image_bytes = image.file.read()
+                    image_vector = await vectorize_image(
+                        image_bytes, model, img_transform
+                    )
                     if not isinstance(image_vector, list) or not all(
                         isinstance(x, (float, int)) for x in image_vector
                     ):
