@@ -31,21 +31,30 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.info("Initializing backend")
 
+def determine_device(): 
+    if torch.backends.mps.is_available(): 
+        return torch.device('mps')
+    elif torch.cuda.is_available():
+        return torch.device('cuda')
+    else:
+        return torch.device('cpu')
+
 # Torch setup
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = determine_device()
 
 EMBEDDING_SIZE = 256  # TODO: put this in .env
 model = torch.hub.load("pytorch/vision:v0.10.0", "resnet18", weights=None)
 num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, EMBEDDING_SIZE)
-model.load_state_dict(torch.load("tuned.pth", map_location=device))
+model.load_state_dict(torch.load("resnet18_tuned.pth", map_location=device))
 model.to(device)
 model.eval()
 
 img_transform = transforms.Compose(
     [
-        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),  # Random crop
+        transforms.RandomResizedCrop(224, scale=(1.0, 1.0)),  # Random crop
         transforms.ToTensor(),
+        transforms.Lambda(lambda x: x.to(torch.float32)),  # Convert to float32, otherwise this would not work in MPS.
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
 )
