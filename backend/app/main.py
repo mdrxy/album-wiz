@@ -46,7 +46,7 @@ EMBEDDING_SIZE = 256  # TODO: put this in .env
 model = torch.hub.load("pytorch/vision:v0.10.0", "resnet18", weights=None)
 num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, EMBEDDING_SIZE)
-model.load_state_dict(torch.load("tuned.pth", map_location=device))
+model.load_state_dict(torch.load("resnet18_tuned.pth", map_location=device))
 model.to(device)
 model.eval()
 
