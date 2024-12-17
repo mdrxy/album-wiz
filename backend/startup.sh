@@ -13,7 +13,12 @@ done
 echo "Starting prelim data import via API..."
 curl -X POST "http://127.0.0.1:8000/api/albums" \
     -H "Content-Type: multipart/form-data" \
-    -F "file=@/app/import.csv"
+    -F "file=@/app/import-albums.csv"
+
+sleep 5
+curl -X POST "http://127.0.0.1:8000/api/songs" \
+    -H "Content-Type: multipart/form-data" \
+    -F "file=@/app/import-songs.csv"
 
 # Vectorize the data
 echo "Starting vectorization..."

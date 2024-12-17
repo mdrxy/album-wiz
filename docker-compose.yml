@@ -30,7 +30,8 @@ services:
     volumes:
       - ./backend:/app
       - ./database/sample_data/images:/media
-      - ./database/sample_data/import.csv:/app/import.csv
+      - ./database/sample_data/import-albums.csv:/app/import-albums.csv
+      - ./database/sample_data/import-songs.csv:/app/import-songs.csv
       - ./debugging_imgs:/app/debugging_imgs
     environment:
       - DATABASE_URL

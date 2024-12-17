@@ -163,6 +163,7 @@ cython_debug/
 
 myenv/
 node_modules/
-backend/import.csv
+backend/import-albums.csv
+backend/import-songs.csv
 .DS_Store
 debugging_imgs/

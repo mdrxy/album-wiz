@@ -19,7 +19,7 @@ from PIL import Image
 from pgvector.asyncpg import register_vector
 
 from app.metadata_orchestrator import MetadataOrchestrator
-from app.import_albums import import_albums
+from app.import_csv import import_albums, import_songs
 from app.process.utils import validate_image, get_image
 from app.process.cover_extractor import extract_album_cover, bg_removal
 from app.process.logic import vectorize_image, match_vector
@@ -29,8 +29,6 @@ from app.process.logic import vectorize_image, match_vector
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-numba_logger = logging.getLogger("numba")
-numba_logger.setLevel(logging.WARNING)
 logger.info("Initializing backend")
 
 # Torch setup
@@ -349,7 +347,7 @@ async def delete_album(album_id: int) -> dict:
 
 
 @router.post("/albums")
-async def upload_csv(file: UploadFile = File(...)) -> dict:
+async def upload_albums_csv(file: UploadFile = File(...)) -> dict:
     """
     Endpoint to upload a CSV file and import album data into the database.
 
@@ -384,6 +382,43 @@ async def upload_csv(file: UploadFile = File(...)) -> dict:
         logger.error("Error uploading CSV: %s", traceback.format_exc())
         raise HTTPException(
             status_code=500, detail=f"Failed to import albums: {str(e)}"
+        ) from e
+
+
+@router.post("/songs")
+async def upload_songs_csv(file: UploadFile = File(...)) -> dict:
+    """
+    Endpoint to upload a CSV file and import song data into the database.
+
+    Temporary files are saved to /tmp and deleted after processing.
+
+    Parameters:
+    - file (UploadFile): CSV file containing song data.
+
+    Returns:
+    - dict: Success message if the import completes.
+
+    Raises:
+    - HTTPException: If the file is not a CSV or an error occurs during import.
+    """
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are supported.")
+
+    try:
+        # Save the file temporarily
+        temp_file_path = f"/tmp/{file.filename}"
+        with open(temp_file_path, "wb") as temp_file:
+            contents = await file.read()
+            temp_file.write(contents)
+
+        await import_songs(app, temp_file_path)
+        os.remove(temp_file_path)
+
+        return {"message": "Songs imported successfully."}
+    except Exception as e:
+        logger.error("Error uploading CSV: %s", traceback.format_exc())
+        raise HTTPException(
+            status_code=500, detail=f"Failed to import songs: {str(e)}"
         ) from e
 
 
