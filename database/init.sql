@@ -1,69 +1,96 @@
+-- Add an extension for vectorized queries (pgvector)
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Create the artists table to store artist metadata
 CREATE TABLE artists (
     id SERIAL PRIMARY KEY,               -- Unique identifier for the artist
-    name VARCHAR(255) NOT NULL,          -- Artist name
-    genre VARCHAR(100),                  -- Genre of the artist
-    popularity_score INT,                -- Popularity score (e.g., from Spotify/Last.fm)
+    name VARCHAR(255) UNIQUE NOT NULL,   -- Artist name
+    name_vars VARCHAR(255),              -- Artist name variations
+    genres VARCHAR(100),                 -- Genres of the artist
+    popularity INT,                      -- Artist popularity
+    artist_url TEXT,                     -- URL to the artist page on the streaming platform
+    a_profile TEXT,                        -- Artist profile (paragraph or bio)
     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
     updated_at TIMESTAMP DEFAULT NOW()   -- Last updated timestamp
 );
 
 -- Create the albums table to store album metadata
 CREATE TABLE albums (
-    id SERIAL PRIMARY KEY,               -- Unique identifier for the album
-    title VARCHAR(255) NOT NULL,         -- Album title
+    id SERIAL PRIMARY KEY,               -- Unique identifier for the album (record ID)
+    title VARCHAR(255) UNIQUE NOT NULL,  -- Album title
     artist_id INT NOT NULL,              -- Foreign key to the artist (from the artists table)
-    release_date DATE,                   -- Release date of the album (ISO-8601 format?)
-    genre VARCHAR(100),                  -- Genre of the album
-    cover_image_url TEXT,                -- URL for the album cover image
-    popularity_score INT,                -- Popularity score (e.g., from Spotify/Last.fm)
+    release_date DATE,                   -- Release date of the album
+    genres VARCHAR(255),                 -- Genre of the album
+    duration_seconds INT,                -- Total duration of the album in seconds
+    cover_image TEXT,                    -- Cover image file path
+                                         -- Assuming all containers use /media as the root directory
+    album_url TEXT,                      -- URL to the album on the streaming platform
+    total_tracks INT DEFAULT 0,          -- Total number of tracks for the album
+    embedding VECTOR(256),               -- Vectorized representation for the album (initially empty)
     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
     updated_at TIMESTAMP DEFAULT NOW(),  -- Last updated timestamp
     FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE CASCADE
 );
 
--- -- Create the tracks table to store track details
--- CREATE TABLE tracks (
---     id SERIAL PRIMARY KEY,               -- Unique identifier for the track
---     album_id INT NOT NULL,               -- Foreign key to the album
---     title VARCHAR(255) NOT NULL,         -- Track title
---     duration_seconds INT,                -- Duration of the track in seconds
---     explicit BOOLEAN DEFAULT FALSE,      -- Indicates if the track contains explicit content
---     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
---     updated_at TIMESTAMP DEFAULT NOW(),  -- Last updated timestamp
---     FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE
--- );
-
--- Create the queries table to cache query results
-CREATE TABLE queries (
-    id SERIAL PRIMARY KEY,               -- Unique identifier for the query
-    query_text TEXT NOT NULL,            -- Text of the search query
-    result JSONB NOT NULL,               -- JSON object containing the query result
+-- Create the tracks table to store track details
+CREATE TABLE IF NOT EXISTS tracks (
+    id SERIAL PRIMARY KEY,               -- Unique identifier for the track
+    album_id INT NOT NULL,               -- Foreign key to the album
+    title VARCHAR(255) NOT NULL,         -- Track title
+    duration_seconds INT,                -- Duration of the track in seconds
+    explicit BOOLEAN,                    -- Indicates if the track contains explicit content
     created_at TIMESTAMP DEFAULT NOW(),  -- Record creation timestamp
-    updated_at TIMESTAMP DEFAULT NOW()   -- Last updated timestamp
+    updated_at TIMESTAMP DEFAULT NOW(),  -- Last updated timestamp
+    FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE,
+    CONSTRAINT unique_title_album UNIQUE (title, album_id)
 );
 
--- Create an index on the queries table for efficient search
-CREATE INDEX idx_query_text ON queries (query_text);
+-- ============================
+-- ====== Trigger Setup ======
+-- ============================
 
--- Add an extension for vectorized queries (pgvector)
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Function to increment total_tracks when a new track is added
+CREATE OR REPLACE FUNCTION increment_total_tracks()
+RETURNS TRIGGER AS $$
+DECLARE
+    album_id INT;
+BEGIN
+    -- Retrieve the album_id from the new track
+    album_id := NEW.album_id;
 
--- Add a column for latent vector embeddings in the albums table for vector search
-ALTER TABLE albums ADD COLUMN embedding VECTOR(256); -- TODO: May need to update dimension size?
+    -- Update the total_tracks count for the album
+    UPDATE albums SET total_tracks = total_tracks + 1 WHERE id = album_id;
 
--- Insert example data (optional for development)
-INSERT INTO artists (name, genre, popularity_score) VALUES
-('Radiohead', 'Alternative Rock', 90),
-('Kendrick Lamar', 'Hip-Hop', 95),
-('Taylor Swift', 'Pop', 98);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-INSERT INTO albums (title, artist_id, release_date, genre, cover_image_url, popularity_score) VALUES
-('OK Computer', 1, '1997-05-21', 'Alternative Rock', 'https://example.com/ok_computer.jpg', 95),
-('DAMN.', 2, '2017-04-14', 'Hip-Hop', 'https://example.com/damn.jpg', 94),
-('1989', 3, '2014-10-27', 'Pop', 'https://example.com/1989.jpg', 97);
+-- Function to decrement total_tracks when a track is deleted
+CREATE OR REPLACE FUNCTION decrement_total_tracks()
+RETURNS TRIGGER AS $$
+DECLARE
+    album_id INT;
+BEGIN
+    -- Retrieve the album_id from the deleted track
+    album_id := OLD.album_id;
 
--- INSERT INTO tracks (album_id, title, duration_seconds, explicit) VALUES
--- (1, 'Paranoid Android', 388, FALSE),
--- (2, 'HUMBLE.', 177, TRUE),
--- (3, 'Shake It Off', 242, FALSE);
+    -- Update the total_tracks count for the album, ensuring it doesn't go below zero
+    UPDATE albums 
+    SET total_tracks = GREATEST(total_tracks - 1, 0) 
+    WHERE id = album_id;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to call increment_total_tracks after inserting a new track
+CREATE TRIGGER trg_increment_total_tracks
+AFTER INSERT ON tracks
+FOR EACH ROW
+EXECUTE FUNCTION increment_total_tracks();
+
+-- Trigger to call decrement_total_tracks after deleting a track
+CREATE TRIGGER trg_decrement_total_tracks
+AFTER DELETE ON tracks
+FOR EACH ROW
+EXECUTE FUNCTION decrement_total_tracks();

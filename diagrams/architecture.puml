@@ -1,0 +1,31 @@
+@startuml
+!define RECTANGLE #lightgrey
+
+RECTANGLE "user" as user
+
+package "vinyl-network" {
+    RECTANGLE "nginx" as nginx
+    RECTANGLE "frontend" as frontend
+    RECTANGLE "backend" as backend
+
+    database "PostgreSQL" as db
+}
+
+user -right-> nginx
+
+nginx -right-> frontend : Routes Traffic
+nginx -down-> backend : Routes API
+
+frontend -down-> backend : API Requests
+backend -down-> db
+
+note top of nginx
+  - Routes HTTP traffic
+  - Serves frontend app
+end note
+
+note right of backend
+  - Exposes API endpoints
+  - Handles recognition and metadata
+end note
+@enduml

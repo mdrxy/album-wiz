@@ -6,3 +6,16 @@ torch
 numpy
 asyncpg
 pillow
+python-multipart
+aiohttp
+python3-discogs-client
+spotipy
+python-dotenv
+musicbrainzngs
+pandas
+torchvision
+pgvector
+opencv-python-headless
+matplotlib
+rembg
+onnxruntime

@@ -1,14 +1,14 @@
 {
-    "Servers": {
-      "1": {
-        "Name": "Vinyl Database",
-        "Group": "Servers",
-        "Host": "vinyl-database",
-        "Port": 5432,
-        "Username": "admin",
-        "Password": "postgres",
-        "SSLMode": "prefer",
-        "MaintenanceDB": "vinyl_db"
-      }
+  "Servers": {
+    "1": {
+      "Name": "Vinyl Database",
+      "Group": "Servers",
+      "Host": "vinyl-database",
+      "Port": 5432,
+      "Username": "postgres",
+      "Password": "postgres",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "vinyl_db"
     }
   }
+}
