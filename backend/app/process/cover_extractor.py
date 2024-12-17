@@ -6,6 +6,7 @@ import os
 from io import BytesIO
 import logging
 from typing import Optional, Tuple, List
+import urllib.request
 import numpy as np
 import cv2
 from PIL import Image
@@ -33,6 +34,38 @@ for file in os.listdir(DEBUGGING_DIR):
             os.unlink(file_path)
     except OSError as e:
         logger.error("Failed to delete file %s: %s", file_path, e)
+
+# Define the model URL and path
+MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx"
+MODEL_DIR = os.path.expanduser("~/.u2net")  # Default directory used by rembg
+MODEL_PATH = os.path.join(MODEL_DIR, "u2net.onnx")
+
+
+def download_model(url: str, path: str):
+    """
+    Download the u2net.onnx model if it does not exist.
+
+    Parameters:
+    - url (str): The URL to download the model from.
+    - path (str): The local file path to save the model.
+    """
+    if not os.path.exists(path):
+        logger.info(f"Downloading u2net model from {url} to {path}")
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with urllib.request.urlopen(url) as response, open(path, "wb") as out_file:
+                data = response.read()
+                out_file.write(data)
+            logger.info("u2net model downloaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to download u2net model: {e}")
+            raise
+    else:
+        logger.debug("u2net model already exists. Skipping download.")
+
+
+# Download the model on script startup
+download_model(MODEL_URL, MODEL_PATH)
 
 
 def save_image(image: np.ndarray, filename: str):
