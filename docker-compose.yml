@@ -35,7 +35,6 @@ services:
       - ./debugging_imgs:/app/debugging_imgs
     environment:
       - DATABASE_URL
-      - REDIS_URL
       - MEDIA_DIR
       - NUMBA_DEBUG=0
     env_file:
@@ -104,7 +103,6 @@ services:
 
 volumes:
   postgres_data: # Define a persistent volume for the PostgreSQL database (to outlive container restarts)
-  redis_data: # Persistent volume for the Redis cache
 
 networks:
   vinyl-network:
