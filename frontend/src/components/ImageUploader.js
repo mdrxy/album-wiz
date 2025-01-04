@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "../axiosConfig"; // Import the configured axios instance
+import axios from "../axiosConfig";
 
 const ImageUploader = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -7,14 +7,15 @@ const ImageUploader = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(null);
   const [uploadError, setUploadError] = useState(null);
-  const [responseData, setResponseData] = useState(null); // State for response data
-  const [showTracks, setShowTracks] = useState(false); // State for toggling tracks
-  const [isDragging, setIsDragging] = useState(false); // State for drag over
-  const [isMobile, setIsMobile] = useState(false); // New state for device type
+  const [responseData, setResponseData] = useState(null);
+  const [showTracks, setShowTracks] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isMobile, setIsMobile] = useState(false); // Device type (mobile/desktop)
 
   useEffect(() => {
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
     // Simple mobile detection
+    // TODO: make this more robust
     if (
       /android|iphone|ipad|iPod|opera mini|iemobile|wpdesktop/i.test(
         userAgent.toLowerCase()
@@ -23,8 +24,6 @@ const ImageUploader = () => {
       setIsMobile(true);
     }
   }, []);
-
-  // Helper function to format duration
 
   // Format values for better display
   const monthNames = {
@@ -76,9 +75,9 @@ const ImageUploader = () => {
     const totalSeconds = parseInt(value, 10);
     if (isNaN(totalSeconds) || totalSeconds < 0) return "0m 0s";
 
-    const hours = Math.floor(totalSeconds / 3600); // Calculate hours
-    const minutes = Math.floor((totalSeconds % 3600) / 60); // Remaining minutes
-    const seconds = totalSeconds % 60; // Remaining seconds
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
     if (hours > 0) {
       return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
@@ -128,7 +127,6 @@ const ImageUploader = () => {
     }
   };
 
-  // Process the selected or dropped file
   const processFile = (file) => {
     try {
       if (!file.type.startsWith("image/")) {
@@ -148,7 +146,6 @@ const ImageUploader = () => {
     }
   };
 
-  // Handle image upload using axios
   const handleUpload = async () => {
     if (!selectedFile) {
       alert("Please select an image to upload.");
@@ -183,12 +180,10 @@ const ImageUploader = () => {
     }
   };
 
-  // Handle "Upload Another" button click
   const handleUploadAnother = () => {
     resetUploader();
   };
 
-  // Handle the drag start event
   const handleDragStart = useCallback((event) => {
     event.dataTransfer.clearData();
     event.dataTransfer.setData(
@@ -197,22 +192,20 @@ const ImageUploader = () => {
     );
   }, []);
 
-  // Handle the drag over event
   const handleDragOver = useCallback((event) => {
-    event.preventDefault(); // Prevent default behavior
+    event.preventDefault();
     setIsDragging(true);
   }, []);
 
-  // Handle the drag leave event
   const handleDragLeave = useCallback((event) => {
-    event.preventDefault(); // Prevent default behavior
+    event.preventDefault();
     setIsDragging(false);
   }, []);
 
   // Handle the drop event
   const handleDrop = useCallback(
     (event) => {
-      event.preventDefault(); // Prevent default behavior
+      event.preventDefault();
       setIsDragging(false);
 
       // Clear previous results and errors
@@ -259,7 +252,7 @@ const ImageUploader = () => {
     };
   }, [previewUrl]);
 
-  // Common button styles
+  // Button styles
   const buttonStyle = {
     fontSize: "1.2rem",
     padding: "10px 20px",

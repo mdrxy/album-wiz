@@ -1,25 +1,24 @@
 services:
   frontend:
     build:
-      context: ./frontend # The local path to the frontend source code
+      context: ./frontend
     container_name: vinyl-frontend
     volumes:
-      - ./frontend:/app # Mounts the entire local frontend directory as `/app` in the container
+      - ./frontend:/app
       - /app/node_modules # Prevents the node_modules directory from being overridden by the container
         # (avoid conflicts between the dependencies installed on the host machine and those installed inside the container)
       - ./database/sample_data/images:/app/media # Shared volume for album art and other media files
     environment:
-      # Variables that can be accessed in the frontend application
       - REACT_APP_API_BASE_URL # `/api`
       - CHOKIDAR_INTERVAL=100
       - CHOKIDAR_USEPOLLING # File change detection for reload
       - WDS_SOCKET_PORT=0 # Use the default Webpack Dev Server socket port (needed for hot reloading)
     env_file:
-      - .env # `environment` pulls from this file in the root directory of this folder
+      - .env
     depends_on:
       - backend # Only startup after the backend service is up
     networks:
-      - vinyl-network # Putting all services in the same network for inter-container communication
+      - vinyl-network
 
   # Local backend changes are automatically reflected in the container upon saving
   # (Exception: changes to the Dockerfile require a rebuild)
@@ -51,7 +50,7 @@ services:
     image: postgres:15
     container_name: vinyl-database
     build:
-      context: ./database # Tell Docker to build the database service from the Dockerfile in the database directory
+      context: ./database
     healthcheck:
       test: [ "CMD", "pg_isready", "-U", "postgres" ]
       interval: 10s
@@ -76,23 +75,22 @@ services:
     env_file:
       - .env
     volumes:
-      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Mount the pre-configured servers.json file
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro # Pre-configured servers.json file
     depends_on:
       database:
-        # Ensure the database container starts before pgAdmin
         condition: service_healthy
     networks:
       - vinyl-network
 
   nginx:
-    image: nginx:latest # Use the official Nginx image.
+    image: nginx:latest
     container_name: vinyl-nginx
     ports:
-      - "80:80" # Default (http) web port
+      - "80:80"
     volumes:
-      - ./frontend/build:/usr/share/nginx/html:ro # Mount the built folder of the frontend app
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # Bind mount the config file. 'ro' ensures read-only access meaning the container can't modify the file on the host
-      - ./nginx/favicon.ico:/etc/nginx/favicon.ico:ro # Bind mount the favicon
+      - ./frontend/build:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/favicon.ico:/etc/nginx/favicon.ico:ro
       - ./database/sample_data/images:/media:ro
     depends_on:
       - frontend
@@ -106,4 +104,4 @@ volumes:
 
 networks:
   vinyl-network:
-    # Define a custom network for inter-container communication
+    # Custom network for inter-container communication

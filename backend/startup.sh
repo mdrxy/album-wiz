@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Start the FastAPI application in the background
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
 
 # Wait for the application to be up and import the CSV file using the API endpoint

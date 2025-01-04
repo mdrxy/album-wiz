@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import axios from "../axiosConfig"; // Import the configured axios instance
+import axios from "../axiosConfig";
 import {
   Form,
   Button,
@@ -12,7 +12,7 @@ import {
   Badge,
   ProgressBar,
 } from "react-bootstrap";
-import "bootstrap-icons/font/bootstrap-icons.css"; // Import Bootstrap Icons CSS
+import "bootstrap-icons/font/bootstrap-icons.css";
 
 // A mapping from internal field keys to more user-friendly display names.
 const fieldDisplayNames = {
@@ -60,6 +60,7 @@ const MetadataManager = () => {
   const errorRef = useRef(null);
 
   // This function checks if a given URL looks like an image URL
+  // TODO: improve this to handle more cases
   const isImageUrl = (url) => {
     if (typeof url !== "string") return false;
     return (

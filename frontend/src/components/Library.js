@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "../axiosConfig"; // Import the configured axios instance
+import axios from "../axiosConfig";
 import {
   Table,
   Spinner,
@@ -13,7 +13,6 @@ import {
   ButtonGroup,
 } from "react-bootstrap";
 
-// Define cache keys and expiration (e.g., 24 hours)
 const CACHE_KEYS = {
   ARTISTS: "cache_artists",
   ALBUMS: "cache_albums",
