@@ -1,5 +1,5 @@
-@startuml Vinyl Companion High-Level Sequence Diagram
-title Vinyl Companion High-Level Sequence Diagram
+@startuml album-wiz High-Level Sequence Diagram
+title album-wiz High-Level Sequence Diagram
 actor DJ as User
 participant "Frontend" as App
 participant "Backend" as Backend

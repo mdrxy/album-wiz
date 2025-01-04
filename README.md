@@ -187,6 +187,8 @@ docker exec vinyl-nginx nginx -s reload
 ### Long-term
 
 - Caching
+- Deployment
+- Routine metadata updates
 - Detailed error messages
   - Debugging view - present the debugging image stages
 - Batch detection? Instance segmentation.
