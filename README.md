@@ -11,6 +11,9 @@ The project is containerized with Docker to increase compatibility across platfo
 - **Database**: PostgreSQL with `pgvector` for vectorized queries. pgAdmin is available for browsing the database in a web browser.
 - **Nginx**: Reverse proxy for routing traffic between services.
 
+![architecture](./diagrams/png/album-wiz%20High-Level%20Architecture%20Diagram.png)
+![sequence](./diagrams/png/album-wiz%20High-Level%20Sequence%20Diagram.png)
+
 ## Getting Started
 
 ### Prerequisites
