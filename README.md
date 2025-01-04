@@ -1,6 +1,6 @@
 # Vinyl Record Recognition System
 
-This project is a companion tool for radio DJs to help facilitate exploration and discovery with physical collections of vinyl records. By leveraging computer vision, deep learning, and metadata aggregation, this tool aims to reduce the amount of time needed to retrieve relevant information about a given release.
+Companion tool for radio DJs to help facilitate exploration and discovery with physical collections of vinyl records. By leveraging computer vision, deep learning, and metadata aggregation, this tool aims to reduce the amount of time needed to retrieve relevant information about a given release.
 
 ## Project Structure
 
@@ -9,7 +9,6 @@ The project is containerized with Docker to increase compatibility across platfo
 - **Frontend**: React app for user interaction.
 - **Backend**: Python (FastAPI) service for API endpoints, image recognition and metadata aggregation.
 - **Database**: PostgreSQL with `pgvector` for vectorized queries. pgAdmin is available for browsing the database in a web browser.
-- **Cache**: Redis for high-performance data caching.
 - **Nginx**: Reverse proxy for routing traffic between services.
 
 ## Getting Started
@@ -183,7 +182,7 @@ docker exec vinyl-nginx nginx -s reload
 
 - Add Records endpoint
   - Interface for selecting just one DB
-  - Resolve
+  - Resolve differences in source metadata
 
 ### Long-term
 
