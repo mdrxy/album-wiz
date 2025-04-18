@@ -4,7 +4,7 @@ fastapi==0.115.6
 uvicorn==0.34.0
 psycopg2-binary==2.9.10
 asyncpg==0.30.0
-torch==2.5.1
+torch==2.6.0
 torchvision==0.20.1
 opencv-python-headless==4.10.0.84
 pandas==2.2.3
