@@ -16,5 +16,5 @@ pillow==11.1.0
 python-multipart==0.0.20
 aiohttp==3.12.14
 python3-discogs-client==2.7.1
-spotipy==2.25.1
+spotipy==2.25.2
 musicbrainzngs==0.7.1
