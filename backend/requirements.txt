@@ -14,7 +14,7 @@ numpy==2.2.1
 matplotlib==3.10.0
 pillow==11.1.0
 python-multipart==0.0.20
-aiohttp==3.12.14
+aiohttp==3.13.3
 python3-discogs-client==2.7.1
 spotipy==2.25.2
 musicbrainzngs==0.7.1
