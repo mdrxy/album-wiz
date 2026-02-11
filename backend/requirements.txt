@@ -12,7 +12,7 @@ rembg==2.0.61
 onnxruntime==1.20.1
 numpy==2.2.1
 matplotlib==3.10.0
-pillow==11.1.0
+pillow==12.1.1
 python-multipart==0.0.20
 aiohttp==3.13.3
 python3-discogs-client==2.7.1
