@@ -13,7 +13,7 @@ onnxruntime==1.20.1
 numpy==2.2.1
 matplotlib==3.10.0
 pillow==12.1.1
-python-multipart==0.0.20
+python-multipart==0.0.22
 aiohttp==3.13.3
 python3-discogs-client==2.7.1
 spotipy==2.25.2
